@@ -2,11 +2,12 @@
 
 Enterprise license-extension platform (portfolio). Orchestrates extension requests across fictional vendor systems **CloudShield** and **NetworkGuard**. No proprietary IP.
 
-Phase 1 delivers solution skeletons, local infrastructure, ADR, and CI. See [docs/implementation-progress.md](docs/implementation-progress.md).
+Phase 2 adds the license-extension request aggregate, EF Core persistence for `entitlex_platform`, and create/get APIs. See [docs/implementation-progress.md](docs/implementation-progress.md).
 
-## Architecture (Phase 1)
+## Architecture
 
 - **Modular control-plane API** (`EntitleX.Api`) with Clean Architecture layers
+- **DDD request aggregate** (`LicenseExtensionRequest` + items) with invariant-enforcing methods
 - **Separate workers** for async work (fulfillment, outbox, reconciliation, notifications)
 - **Vendor simulators** (CloudShield / NetworkGuard), each with Domain → Application → Infrastructure → Api
 - **Lambda stubs** for scheduled approval reminders and expiration notifications
@@ -28,16 +29,29 @@ dotnet build EntitleX.sln
 # Start local infrastructure
 docker compose up -d
 
-# Platform API (http://localhost:5080/health)
+# Platform API (http://localhost:5080/health, Swagger in Development)
+# Development migrates entitlex_platform on startup (Database:MigrateOnStartup)
 dotnet run --project src/EntitleX.Api
 
 # Vendor simulators
 dotnet run --project src/simulators/CloudShield/CloudShield.Api    # :5081/health
 dotnet run --project src/simulators/NetworkGuard/NetworkGuard.Api  # :5082/health
 
+# Tests
+dotnet test tests/EntitleX.Domain.UnitTests
+dotnet test tests/EntitleX.Infrastructure.IntegrationTests   # requires Docker for Testcontainers
+
 # Frontend scaffold
 cd frontend && npm install && npm run dev
 ```
+
+### License-extension API (Phase 2)
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `POST` | `/api/v1/license-extension-requests` | Create + submit; max 1000 items |
+| `GET` | `/api/v1/license-extension-requests/{id}` | Load request with items |
+| `GET` | `/swagger` | OpenAPI UI (Development) |
 
 Workers (optional heartbeat stubs):
 
