@@ -28,7 +28,13 @@ jobs:
         run: dotnet build EntitleX.sln --configuration Release --no-restore
 
       - name: Unit tests
-        run: dotnet test tests/EntitleX.Domain.UnitTests/EntitleX.Domain.UnitTests.csproj --configuration Release --no-build --verbosity normal
+        run: |
+          dotnet test tests/EntitleX.Domain.UnitTests/EntitleX.Domain.UnitTests.csproj --configuration Release --no-build --verbosity normal
+          dotnet test tests/EntitleX.Application.UnitTests/EntitleX.Application.UnitTests.csproj --configuration Release --no-build --verbosity normal
+          dotnet test tests/EntitleX.Infrastructure.UnitTests/EntitleX.Infrastructure.UnitTests.csproj --configuration Release --no-build --verbosity normal
+          dotnet test tests/CloudShield.Domain.UnitTests/CloudShield.Domain.UnitTests.csproj --configuration Release --no-build --verbosity normal
 
       - name: Integration tests
-        run: dotnet test tests/EntitleX.Infrastructure.IntegrationTests/EntitleX.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
+        run: |
+          dotnet test tests/EntitleX.Infrastructure.IntegrationTests/EntitleX.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
+          dotnet test tests/CloudShield.Infrastructure.IntegrationTests/CloudShield.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --verbosity normal

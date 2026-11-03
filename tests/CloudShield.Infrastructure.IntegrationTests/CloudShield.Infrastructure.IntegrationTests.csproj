@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.1.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\simulators\CloudShield\CloudShield.Infrastructure\CloudShield.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\simulators\CloudShield\CloudShield.Application\CloudShield.Application.csproj" />
+    <ProjectReference Include="..\..\src\EntitleX.BuildingBlocks\EntitleX.BuildingBlocks.csproj" />
+    <Compile Include="..\EntitleX.Infrastructure.IntegrationTests\DockerAvailability.cs" Link="DockerAvailability.cs" />
+    <Compile Include="..\EntitleX.Infrastructure.IntegrationTests\DockerFactAttribute.cs" Link="DockerFactAttribute.cs" />
+  </ItemGroup>
+
+</Project>

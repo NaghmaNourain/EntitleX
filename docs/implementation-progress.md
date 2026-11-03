@@ -18,7 +18,7 @@
 
 ---
 
-## Phase 2 — Domain model and request APIs (current)
+## Phase 2 — Domain model and request APIs
 
 **Status:** Complete on branch `cursor/phase-2-domain-apis-bc4f` (based on Phase 1)
 
@@ -27,59 +27,81 @@
 | Item | Result |
 |------|--------|
 | `dotnet build EntitleX.sln` | Succeeds (0 warnings, 0 errors) |
-| Domain unit tests | **11 passed** (`EntitleX.Domain.UnitTests`) — expiry baseline stub + aggregate invariants |
-| Integration tests (Testcontainers) | **2 skipped** — Docker engine/CLI not available in this agent environment |
-| EF migration `InitialLicenseExtension` | Generated for `entitlex_platform` (`license_extension_requests` + items) |
-| MediatR create/get + FluentValidation | Wired; max 1000 items; required fields |
-| API endpoints | `POST/GET /api/v1/license-extension-requests` with ProblemDetails + OpenAPI/Swagger |
+| Domain unit tests | **11 passed** (`EntitleX.Domain.UnitTests`) |
+| Integration tests (Testcontainers) | **2 skipped** without Docker (`DockerFact`) |
+| EF migration `InitialLicenseExtension` | Generated for `entitlex_platform` |
+| MediatR create/get + FluentValidation | Wired; max 1000 items |
+| API endpoints | `POST/GET /api/v1/license-extension-requests` |
+
+---
+
+## Phase 3 — Providers + entitlement aggregation (current)
+
+**Status:** Complete on branch `cursor/phase-3-providers-bc4f` (based on Phase 2)
+
+### Verified
+
+| Item | Result |
+|------|--------|
+| `dotnet build EntitleX.sln` | Succeeds (0 warnings, 0 errors) |
+| CloudShield / NetworkGuard domain unit tests | Passed |
+| Aggregation + adapter unit tests | Passed |
+| Provider integration (Testcontainers) | Skipped without Docker (`DockerFact`) |
+| EF migrations | `InitialCloudShield`, `InitialNetworkGuard` |
+
+### Delivered in Phase 3
+
+**Simulator APIs (own DBs + deterministic seed)**
+
+- CloudShield (`cloudshield` DB): account entitlement discovery, details (product/group/expiry), license-extension submit, operation status lookup
+- NetworkGuard (`networkguard` DB): tenant license discovery, details (SKU/group/validity), extension submit, operation status lookup
+- Demo seeds: `CUST-1001` appears in both providers; additional exclusive customers for partial-coverage demos
+- Development: `Database:MigrateOnStartup` + `Database:SeedDemoData`
+
+**AppliedLicenseOperation**
+
+- Unique `LogicalOperationId` (DB unique index)
+- Atomic claim + expiry update inside a single provider DB transaction
+- Idempotent replay returns `AlreadyApplied` without double-extending
+- No remote HTTP is performed while a DB transaction is open
+
+**Control-plane aggregation**
+
+- `IProviderEntitlementClient` adapters via `IHttpClientFactory`
+- Polly v8 (`Microsoft.Extensions.Http.Resilience`): timeout, retry+jitter for idempotent GET clients only, circuit breaker, concurrency limiter (bulkhead)
+- Separate command HttpClients **without** retry (non-idempotent POSTs must not be blindly retried)
+- Normalized `NormalizedEntitlementDto`; partial aggregation when a provider fails
+- Correlation IDs (`X-Correlation-ID`) + structured Serilog
+- Health checks: `/health/ready`, `/health/providers` (per-provider tags)
+
+**API**
+
+- `GET /api/v1/entitlements/search?customerId={id}` — fan-out aggregation
+
+**Tests**
+
+- `EntitleX.Application.UnitTests` — partial aggregation
+- `EntitleX.Infrastructure.UnitTests` — adapter normalization (CloudShield + NetworkGuard)
+- `CloudShield.Domain.UnitTests` — expiry / AppliedLicenseOperation invariants
+- `CloudShield.Infrastructure.IntegrationTests` — atomic claim idempotency (Testcontainers; skips without Docker)
 
 ### Unverified in this environment
 
 | Item | Reason |
 |------|--------|
-| Testcontainers PostgreSQL persist/load | Docker not installed/available; tests auto-skip via `DockerFact` |
-| Live API against Compose Postgres | Requires `docker compose up` + migrate |
-| Concurrent update conflict on `row_version` | Unit coverage only; needs live DB |
+| Live simulator ↔ API aggregation against Compose | Docker engine/CLI not available |
+| Testcontainers PostgreSQL for claim/idempotency | Docker not available; tests auto-skip |
+| Circuit-breaker trip under sustained provider failure | Unit coverage of adapters/aggregation only |
 
-### Delivered in Phase 2
+### Explicitly out of scope (Phase 3)
 
-**Domain (rich aggregate, not anemic)**
-
-- `LicenseExtensionRequest` + `LicenseExtensionRequestItem`
-- Invariants: ≤1000 items; `ParentId` must be null for fresh create; status transition graph stubs (`Draft` → `Submitted` for create); `ApprovalVersion` / `ApprovedScopeHash` fields + approval stub methods
-- `ExpiryBaselineRules` stub: requested expiry must be strictly after current expiry baseline
-- Strongly typed IDs in BuildingBlocks: `RequestId`, `RequestItemId`, `LogicalOperationId`, `AttemptId`, `EntitlementId`
-
-**Infrastructure**
-
-- EF Core 8 + Npgsql mappings for `entitlex_platform`
-- Unique index on `ExtensionNumber`; FKs (items → request, optional parent self-FK); `row_version` concurrency token; supporting indexes
-- Migration: `src/EntitleX.Infrastructure/Persistence/Migrations/…_InitialLicenseExtension.cs`
-- Repository + `IUnitOfWork` via `EntitleXDbContext`
-
-**Application / API**
-
-- `CreateLicenseExtensionRequestCommand` / `GetLicenseExtensionRequestQuery` (MediatR)
-- FluentValidation (item cap, required fields, provider enum, expiry ordering)
-- Validation pipeline behavior → ProblemDetails (`400` / `404` / `409` / `422`)
-- Swagger/OpenAPI in Development
-- Connection string `EntitleXPlatform`; optional `Database:MigrateOnStartup` (enabled in Development)
-
-**Tests**
-
-- `tests/EntitleX.Domain.UnitTests`
-- `tests/EntitleX.Infrastructure.IntegrationTests` (Testcontainers PostgreSQL; skips without Docker)
-
-### Explicitly out of scope (Phase 2)
-
-- Approvals workflow / JWT auth (Phase 4)
-- Provider aggregation / simulator vendor APIs (Phase 3)
+- Approvals / JWT (Phase 4)
 - Outbox / SQS / Kafka (Phase 5+)
-- Saga / selective retry factories beyond ParentId null invariant (Phase 6–7)
-- React feature pages, Terraform, cloudshield/networkguard EF schemas
+- Saga / selective retry factories (Phase 6–7)
+- React entitlement search UI (Phase 10)
 
 ---
 
 ## Remaining (roadmap only — not started)
 
-3. Providers + aggregation · 4. Approvals + auth · 5. Outbox/SQS/Kafka · 6. Saga · 7. Selective retry · 8. Reconciliation · 9. Lambdas · 10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.
+4. Approvals + auth · 5. Outbox/SQS/Kafka · 6. Saga · 7. Selective retry · 8. Reconciliation · 9. Lambdas · 10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.

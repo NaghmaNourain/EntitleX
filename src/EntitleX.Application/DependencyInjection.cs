@@ -1,5 +1,7 @@
 using System.Reflection;
 using EntitleX.Application.Common.Behaviors;
+using EntitleX.Application.EntitlementAggregation;
+using EntitleX.Application.EntitlementAggregation.Abstractions;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,6 +20,8 @@ public static class DependencyInjection
         });
 
         services.AddValidatorsFromAssembly(assembly);
+
+        services.AddScoped<IEntitlementAggregationService, EntitlementAggregationService>();
 
         return services;
     }

@@ -1,55 +1,90 @@
 using EntitleX.Api.Endpoints;
 using EntitleX.Api.Infrastructure;
+using EntitleX.Api.Middleware;
 using EntitleX.Application;
 using EntitleX.Infrastructure;
 using EntitleX.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
-builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
-
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
+try
 {
-    options.SwaggerDoc("v1", new()
+    var builder = WebApplication.CreateBuilder(args);
+
+    builder.Host.UseSerilog((context, services, configuration) => configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Service", "EntitleX.Api")
+        .WriteTo.Console());
+
+    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration);
+
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen(options =>
     {
-        Title = "EntitleX API",
-        Version = "v1",
-        Description = "Enterprise license-extension control plane (Phase 2)."
+        options.SwaggerDoc("v1", new()
+        {
+            Title = "EntitleX API",
+            Version = "v1",
+            Description = "Enterprise license-extension control plane (Phase 3)."
+        });
     });
-});
 
-builder.Services.AddProblemDetails();
+    builder.Services.AddProblemDetails();
 
-var app = builder.Build();
+    var app = builder.Build();
 
-app.UseEntitleXExceptionHandler();
+    app.UseMiddleware<CorrelationIdMiddleware>();
+    app.UseSerilogRequestLogging();
+    app.UseEntitleXExceptionHandler();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
+
+    app.MapGet("/health", () => Results.Ok(new
+    {
+        status = "Healthy",
+        service = "EntitleX.Api",
+        timestampUtc = DateTimeOffset.UtcNow
+    }));
+
+    app.MapHealthChecks("/health/ready");
+    app.MapHealthChecks("/health/providers", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("provider")
+    });
+
+    app.MapLicenseExtensionEndpoints();
+    app.MapEntitlementAggregationEndpoints();
+
+    if (ShouldMigrateOnStartup(app.Configuration))
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EntitleXDbContext>();
+        await db.Database.MigrateAsync();
+    }
+
+    await app.RunAsync();
 }
-
-app.MapGet("/health", () => Results.Ok(new
+catch (Exception ex) when (ex is not HostAbortedException)
 {
-    status = "Healthy",
-    service = "EntitleX.Api",
-    timestampUtc = DateTimeOffset.UtcNow
-}));
-
-app.MapLicenseExtensionEndpoints();
-
-if (ShouldMigrateOnStartup(app.Configuration))
-{
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<EntitleXDbContext>();
-    await db.Database.MigrateAsync();
+    Log.Fatal(ex, "EntitleX.Api terminated unexpectedly");
+    throw;
 }
-
-await app.RunAsync();
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
 
 static bool ShouldMigrateOnStartup(IConfiguration configuration) =>
     configuration.GetValue("Database:MigrateOnStartup", defaultValue: false);
