@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-EntitleX.OutboxPublisher-07911715-2c42-477f-b37c-9b2327cd70a8</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\EntitleX.Application\EntitleX.Application.csproj" />
+    <ProjectReference Include="..\..\EntitleX.Messaging\EntitleX.Messaging.csproj" />
+  </ItemGroup>
+</Project>
