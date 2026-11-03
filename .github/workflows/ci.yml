@@ -10,7 +10,7 @@ concurrency:
 
 jobs:
   build:
-    name: Restore and build
+    name: Restore, build, and test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,3 +26,9 @@ jobs:
 
       - name: Build
         run: dotnet build EntitleX.sln --configuration Release --no-restore
+
+      - name: Unit tests
+        run: dotnet test tests/EntitleX.Domain.UnitTests/EntitleX.Domain.UnitTests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Integration tests
+        run: dotnet test tests/EntitleX.Infrastructure.IntegrationTests/EntitleX.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
