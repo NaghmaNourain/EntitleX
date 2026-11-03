@@ -1,0 +1,67 @@
+## .NET
+bin/
+obj/
+out/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.dbmdl
+*.jfm
+project.lock.json
+project.fragment.lock.json
+artifacts/
+TestResults/
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+.nuget/
+packages/
+
+## Node / frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+.npm/
+.yarn/
+.pnp.*
+coverage/
+*.tsbuildinfo
+
+## IDE / editors
+.vs/
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+## Environment / secrets
+.env
+.env.*
+!.env.example
+*.pfx
+*.key
+appsettings.*.local.json
+
+## Docker / local tooling
+.docker/
+docker-data/
+
+## Logs / temp
+*.log
+logs/
+tmp/
+temp/
+.cache/
+
+## OS
+Desktop.ini
+$RECYCLE.BIN/
