@@ -1,5 +1,5 @@
 {
-  "comment": "Phase 9 EventBridge schedule stubs. Real Terraform packaging lands in Phase 12.",
+  "comment": "EventBridge schedule stubs. AWS packaging: infra/terraform/modules/eventbridge + modules/lambda.",
   "rules": [
     {
       "name": "entitlex-approval-reminder",

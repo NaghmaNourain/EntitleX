@@ -12,12 +12,38 @@ outcomes can be repaired without blind-retrying unknown external effects.
 
 ## Worker
 
-`EntitleX.ReconciliationWorker` (every ~30s):
+`EntitleX.ReconciliationWorker` (every ~30s, `take: 50`, actor `"reconciliation-worker"`):
 
 1. Apply elapsed saga timeout hooks (`ApprovalPending` → Escalated,
    `FulfillmentProcessing` → `ReconciliationRequired` + Uncertain items).
 2. List sagas requiring reconciliation.
 3. For each request, run `IReconciliationService.ReconcileRequestAsync`.
+
+Service: `ReconciliationService` (`Application/Reconciliation/ReconciliationService.cs`).
+Probe: `IProviderOperationStatusClient.GetByLogicalOperationIdAsync` (CloudShield/NetworkGuard HTTP GET).
+
+## Decision / repair flow
+
+```mermaid
+flowchart TD
+  Start[Recon pass / ManualReconcile] --> Timeouts[ApplyElapsedTimeoutsAsync]
+  Timeouts --> List[List sagas requiring reconciliation]
+  List --> PerReq[Per request]
+  PerReq --> Probe[GET provider by LogicalOperationId]
+  Probe --> Matrix{Provider lookup}
+  Matrix -->|Confirmed Applied| Repair[CorrectItemSucceededFromReconciliation]
+  Matrix -->|Confirmed Failed| MarkFail[Mark Failed — never demote Succeeded]
+  Matrix -->|NotFound| KeepU1[Keep Uncertain — no blind retry]
+  Matrix -->|Unknown HTTP/error| KeepU2[Keep Uncertain — no blind retry]
+  Repair --> Audit1[Audit ItemRepairedSuccess]
+  MarkFail --> Audit2[Audit ItemMarkedFailed]
+  KeepU1 --> Audit3[Audit ItemStillUnknown]
+  KeepU2 --> Audit3
+  Audit1 --> Agg[Re-aggregate saga / sync request status]
+  Audit2 --> Agg
+  Audit3 --> Agg
+  Agg --> GateNote[Selective retry unblocked only for definitive Failed]
+```
 
 ## Decision matrix
 
@@ -37,7 +63,9 @@ Authorization: Bearer <PlatformAdmin JWT>
 
 Returns the reconciliation run result (saga state, per-item actions,
 `stillRequiresReconciliation`). AuthZ: `CanManageReconciliation` /
-`PlatformAdmin` only.
+`PlatformAdmin` only (endpoint policy + handler re-check).
+
+Ops backlog: `GET /api/v1/admin/ops/summary` (`CanManageReconciliation`).
 
 ## Selective-retry gate (Phase 7 → Phase 8)
 

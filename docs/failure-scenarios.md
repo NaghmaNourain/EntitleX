@@ -1,8 +1,39 @@
-# Failure scenarios (stubs)
+# Failure scenarios
 
 Catalog of failure / uncertainty scenarios EntitleX is designed to survive.
-Phase 8 covers reconciliation for uncertain provider outcomes; later phases
-expand observability and UI-driven operator playbooks.
+Phase 8 covers reconciliation for uncertain provider outcomes; Phase 11 adds
+observability; Phase 10 UI supports operator workflows.
+
+## Failure recovery overview
+
+```mermaid
+flowchart TD
+  Fail[Failure / timeout / lost message] --> Detect{Detection}
+  Detect -->|Fulfillment timeout| Unc[Items Uncertain + ReconciliationRequired]
+  Detect -->|Approval timeout| Esc[Saga Escalated]
+  Detect -->|Provider Failed result| LocFail[Saga item Failed]
+  Detect -->|Duplicate event| Idem[processed_messages / unique LogicalOperationId]
+  Detect -->|Concurrent retry| Claim[retry_item_claims → 409]
+  Detect -->|Lost HTTP on retry| ApiIdem[api_idempotency_records replay]
+
+  Unc --> Recon[Reconciliation GET probe]
+  Recon -->|Applied| Repair[Repair local Succeeded]
+  Recon -->|Failed| MarkF[Mark Failed — selective retry OK]
+  Recon -->|NotFound / Unknown| Hold[Keep Uncertain — no blind POST]
+
+  LocFail --> Gate{ReconciliationGate}
+  Gate -->|clear| SelRetry[Selective retry — new AttemptId]
+  Gate -->|uncertain / mismatch| Recon
+
+  Esc --> Human[Human resume / reminder Lambda]
+  Repair --> Done[Forward recovery — never compensate]
+  MarkF --> SelRetry
+  SelRetry --> Done
+  Idem --> Done
+  Claim --> Done
+  ApiIdem --> Done
+  Hold --> Recon
+```
 
 ## Fulfillment path
 
@@ -24,6 +55,7 @@ expand observability and UI-driven operator playbooks.
 - Blind POST of a new provider extension when status is NotFound / Unknown
 - Compensating “shorten expiry” after a successful apply
 - Retrying items still marked Uncertain / ReconciliationRequired
+- Polly HTTP retry on provider command POSTs (GET clients only)
 
 ## Unit-testable injection points
 
@@ -35,8 +67,8 @@ expand observability and UI-driven operator playbooks.
 | Gate blocks uncertain + ledger mismatches | `ReconciliationGateTests` |
 | AppliedLicenseOperation unique claim | CloudShield `LicenseExtensionApplierTests` |
 
-## Remaining (later phases)
+## Related hardening
 
-- Operator UI for unresolved ReconciliationRequired queues (Phase 10)
-- Metric / alert boards for recon lag (Phase 11)
-- Chaos / Testcontainers end-to-end loss of Kafka completions (when Docker available)
+- Outbox poison after `MaxAttempts`; SQS DLQ after maxReceiveCount 5 — [event-contracts.md](event-contracts.md)
+- Circuit breaker + bulkhead on provider HTTP — [system-design.md](system-design.md)
+- Metrics / traces for backlog and recon lag — [observability.md](observability.md)

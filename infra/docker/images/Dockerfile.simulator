@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1.7
+ARG PROJECT_PATH=src/simulators/CloudShield/CloudShield.Api/CloudShield.Api.csproj
+ARG DLL_NAME=CloudShield.Api.dll
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG PROJECT_PATH
+WORKDIR /src
+COPY Directory.Build.props global.json EntitleX.sln ./
+COPY src/ ./src/
+RUN dotnet restore "${PROJECT_PATH}" \
+ && dotnet publish "${PROJECT_PATH}" -c Release -o /app/publish --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+ARG DLL_NAME
+WORKDIR /app
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ENTITLEX_ENTRY_DLL=${DLL_NAME}
+EXPOSE 8080
+COPY --from=build /app/publish .
+ENTRYPOINT ["sh", "-c", "dotnet \"$ENTITLEX_ENTRY_DLL\""]
