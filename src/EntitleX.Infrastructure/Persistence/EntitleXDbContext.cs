@@ -3,6 +3,7 @@ using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;
 using EntitleX.Infrastructure.Outbox;
+using EntitleX.Infrastructure.Retry;
 using Microsoft.EntityFrameworkCore;
 
 namespace EntitleX.Infrastructure.Persistence;
@@ -15,6 +16,8 @@ public sealed class EntitleXDbContext : DbContext, IUnitOfWork
     }
 
     public DbSet<LicenseExtensionRequest> LicenseExtensionRequests => Set<LicenseExtensionRequest>();
+
+    public DbSet<RetryHistoryEntry> RetryHistoryEntries => Set<RetryHistoryEntry>();
 
     public DbSet<ApprovalCase> ApprovalCases => Set<ApprovalCase>();
 
@@ -33,6 +36,10 @@ public sealed class EntitleXDbContext : DbContext, IUnitOfWork
     public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
 
     public DbSet<FulfillmentItemResult> FulfillmentItemResults => Set<FulfillmentItemResult>();
+
+    public DbSet<ApiIdempotencyRecord> ApiIdempotencyRecords => Set<ApiIdempotencyRecord>();
+
+    public DbSet<RetryItemClaim> RetryItemClaims => Set<RetryItemClaim>();
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

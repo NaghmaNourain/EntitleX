@@ -4,7 +4,9 @@ using EntitleX.Application.Common.Behaviors;
 using EntitleX.Application.EntitlementAggregation;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Application.Fulfillment;
+using EntitleX.Application.LicenseExtension.Retry;
 using EntitleX.Application.Saga;
+// IReconciliationGate registered to StubReconciliationGate (Phase 7 / Phase 8 port)
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,6 +27,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(assembly);
 
         services.AddScoped<IEntitlementAggregationService, EntitlementAggregationService>();
+        services.AddScoped<IReconciliationGate, StubReconciliationGate>();
         services.AddSagaOrchestration();
 
         return services;

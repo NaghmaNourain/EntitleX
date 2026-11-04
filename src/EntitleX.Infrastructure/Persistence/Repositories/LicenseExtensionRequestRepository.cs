@@ -25,6 +25,7 @@ public sealed class LicenseExtensionRequestRepository : ILicenseExtensionRequest
     {
         return await _dbContext.LicenseExtensionRequests
             .Include(x => x.Items)
+            .Include(x => x.RetryHistory)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 

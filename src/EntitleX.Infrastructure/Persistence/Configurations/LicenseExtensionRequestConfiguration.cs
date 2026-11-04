@@ -67,6 +67,10 @@ public sealed class LicenseExtensionRequestConfiguration : IEntityTypeConfigurat
             .HasColumnName("created_at_utc")
             .IsRequired();
 
+        builder.Property(x => x.Notes)
+            .HasColumnName("notes")
+            .HasMaxLength(2000);
+
         builder.Property(x => x.RowVersion)
             .HasColumnName("row_version")
             .IsConcurrencyToken()
@@ -90,6 +94,19 @@ public sealed class LicenseExtensionRequestConfiguration : IEntityTypeConfigurat
             .IsRequired();
 
         builder.Metadata.FindNavigation(nameof(LicenseExtensionRequest.Items))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Navigation(x => x.RetryHistory)
+            .HasField("_retryHistory")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.HasMany(x => x.RetryHistory)
+            .WithOne()
+            .HasForeignKey(x => x.SourceRequestId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+
+        builder.Metadata.FindNavigation(nameof(LicenseExtensionRequest.RetryHistory))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
     }
 }

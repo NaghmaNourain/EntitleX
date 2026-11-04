@@ -209,6 +209,11 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("extension_number");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
                     b.Property<Guid?>("ParentId")
                         .HasColumnType("uuid")
                         .HasColumnName("parent_id");
@@ -300,6 +305,57 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_license_extension_request_items_request_id");
 
                     b.ToTable("license_extension_request_items", "public");
+                });
+
+            modelBuilder.Entity("EntitleX.Domain.LicenseExtension.RetryHistoryEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("ExtensionNumber")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("extension_number");
+
+                    b.Property<int>("ItemCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("item_count");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid>("RetryRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("retry_request_id");
+
+                    b.Property<Guid>("SourceRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_request_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RetryRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_retry_history_retry_request_id");
+
+                    b.HasIndex("SourceRequestId")
+                        .HasDatabaseName("ix_retry_history_source_request_id");
+
+                    b.ToTable("retry_history", "public");
                 });
 
             modelBuilder.Entity("EntitleX.Domain.Saga.LicenseExtensionSaga", b =>
@@ -678,6 +734,73 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                     b.ToTable("processed_messages", "public");
                 });
 
+            modelBuilder.Entity("EntitleX.Infrastructure.Retry.ApiIdempotencyRecord", b =>
+                {
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid>("RetryRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("retry_request_id");
+
+                    b.Property<Guid>("SourceRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_request_id");
+
+                    b.HasKey("IdempotencyKey");
+
+                    b.HasIndex("SourceRequestId")
+                        .HasDatabaseName("ix_api_idempotency_records_source_request_id");
+
+                    b.ToTable("api_idempotency_records", "public");
+                });
+
+            modelBuilder.Entity("EntitleX.Infrastructure.Retry.RetryItemClaim", b =>
+                {
+                    b.Property<Guid>("SourceRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_request_id");
+
+                    b.Property<Guid>("LogicalOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("logical_operation_id");
+
+                    b.Property<DateTimeOffset>("ClaimedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_at_utc");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<Guid>("RetryRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("retry_request_id");
+
+                    b.HasKey("SourceRequestId", "LogicalOperationId");
+
+                    b.HasIndex("IdempotencyKey")
+                        .HasDatabaseName("ix_retry_item_claims_idempotency_key");
+
+                    b.HasIndex("RetryRequestId")
+                        .HasDatabaseName("ix_retry_item_claims_retry_request_id");
+
+                    b.ToTable("retry_item_claims", "public");
+                });
+
             modelBuilder.Entity("EntitleX.Domain.Approval.ApprovalDecision", b =>
                 {
                     b.HasOne("EntitleX.Domain.Approval.ApprovalCase", null)
@@ -713,6 +836,15 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EntitleX.Domain.LicenseExtension.RetryHistoryEntry", b =>
+                {
+                    b.HasOne("EntitleX.Domain.LicenseExtension.LicenseExtensionRequest", null)
+                        .WithMany("RetryHistory")
+                        .HasForeignKey("SourceRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("EntitleX.Domain.Saga.SagaItemOutcome", b =>
                 {
                     b.HasOne("EntitleX.Domain.Saga.LicenseExtensionSaga", null)
@@ -741,6 +873,8 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("EntitleX.Domain.LicenseExtension.LicenseExtensionRequest", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("RetryHistory");
                 });
 
             modelBuilder.Entity("EntitleX.Domain.Saga.LicenseExtensionSaga", b =>

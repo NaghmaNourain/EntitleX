@@ -45,7 +45,7 @@ try
         {
             Title = "EntitleX API",
             Version = "v1",
-            Description = "Enterprise license-extension control plane (Phase 6 — durable saga / forward recovery)."
+            Description = "Enterprise license-extension control plane (Phase 7 — selective retry / idempotency)."
         });
 
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -106,6 +106,7 @@ try
     }).AllowAnonymous();
 
     app.MapLicenseExtensionEndpoints();
+    app.MapLicenseExtensionRetryEndpoints();
     app.MapEntitlementAggregationEndpoints();
     app.MapApprovalEndpoints();
     app.MapSagaEndpoints();
