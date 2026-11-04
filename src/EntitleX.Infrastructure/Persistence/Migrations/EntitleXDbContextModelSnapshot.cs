@@ -537,6 +537,59 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                     b.ToTable("saga_transitions", "public");
                 });
 
+            modelBuilder.Entity("EntitleX.Infrastructure.Audit.AuditEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("detail");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("event_type");
+
+                    b.Property<Guid?>("LogicalOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("logical_operation_id");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventType");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.HasIndex("RequestId");
+
+                    b.ToTable("audit_events", "public");
+                });
+
             modelBuilder.Entity("EntitleX.Infrastructure.Outbox.FulfillmentItemResult", b =>
                 {
                     b.Property<Guid>("Id")

@@ -3,8 +3,9 @@ using EntitleX.Application.Abstractions;
 namespace EntitleX.ReconciliationWorker;
 
 /// <summary>
-/// Phase 6 wires saga timeout-hook scanning. Full provider reconciliation
-/// repair arrives in Phase 8.
+/// Scheduled reconciliation: applies elapsed saga timeouts, then probes providers
+/// for uncertain / missing outcomes and repairs local state. Never blind-retries
+/// unknown external effects.
 /// </summary>
 public sealed class Worker(
     IServiceScopeFactory scopeFactory,
@@ -13,22 +14,30 @@ public sealed class Worker(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation(
-            "ReconciliationWorker started (Phase 6: saga timeout hooks; Phase 8: full repair TBD)");
+            "ReconciliationWorker started (Phase 8: timeout hooks + provider repair)");
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 using var scope = scopeFactory.CreateScope();
-                var orchestrator = scope.ServiceProvider
-                    .GetRequiredService<ILicenseExtensionSagaOrchestrator>();
-                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                var reconciliation = scope.ServiceProvider
+                    .GetRequiredService<IReconciliationService>();
 
-                await orchestrator.ApplyElapsedTimeoutsAsync(
-                    DateTimeOffset.UtcNow,
+                var results = await reconciliation.RunBatchAsync(
                     take: 50,
+                    actor: "reconciliation-worker",
+                    correlationId: null,
                     stoppingToken);
-                await unitOfWork.SaveChangesAsync(stoppingToken);
+
+                if (results.Count > 0)
+                {
+                    var stillOpen = results.Count(r => r.StillRequiresReconciliation);
+                    logger.LogInformation(
+                        "Reconciliation batch processed {Count} request(s); {Open} still require reconciliation",
+                        results.Count,
+                        stillOpen);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -36,7 +45,7 @@ public sealed class Worker(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Saga timeout-hook scan failed");
+                logger.LogError(ex, "Reconciliation batch failed");
             }
 
             await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);

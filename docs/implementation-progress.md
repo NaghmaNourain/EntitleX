@@ -251,7 +251,7 @@
 
 ---
 
-## Phase 7 — Selective retry / idempotency (current)
+## Phase 7 — Selective retry / idempotency
 
 **Status:** Complete on branch `cursor/phase-7-retries-bc4f` (based on Phase 6)
 
@@ -306,6 +306,54 @@
 
 ---
 
+## Phase 8 — Reconciliation / failure repair (current)
+
+**Status:** Complete on branch `cursor/phase-8-reconciliation-bc4f` (based on Phase 7)
+
+### Verified
+
+| Item | Result |
+|------|--------|
+| `dotnet build EntitleX.sln` | Succeeds (0 warnings, 0 errors) |
+| Domain unit tests | Include corrective repair (Uncertain/Failed → Succeeded), keep-unknown |
+| Application unit tests | Reconciliation service failure-injection, concurrent LogicalOperationId idempotency, gate mismatch checks |
+| EF migration `ReconciliationAudit` | `audit_events` |
+| Docs | `docs/reconciliation.md`, `docs/failure-scenarios.md` |
+
+### Delivered in Phase 8
+
+**ReconciliationWorker**
+
+- Applies elapsed saga timeouts, then scans `ReconciliationRequired` / Uncertain / stale Pending
+- Probes CloudShield / NetworkGuard `AppliedLicenseOperation` by `LogicalOperationId` (idempotent GET)
+- Confirmed Applied → repair local Succeeded + backfill fulfillment ledger + audit
+- Confirmed Failed → mark Failed (retry-eligible); never demote local Succeeded
+- NotFound / Unknown → keep `ReconciliationRequired` / Uncertain — **no blind retry**
+
+**Admin API**
+
+- `POST /api/v1/admin/reconciliation/requests/{requestId}` — `PlatformAdmin` only
+
+**Gate**
+
+- Production `ReconciliationGate` replaces Phase 7 stub registration; also blocks local↔saga ledger mismatches
+
+### Unverified in this environment
+
+| Item | Reason |
+|------|--------|
+| Live worker → simulator recon against Compose | No Docker |
+| Testcontainers provider GET / dual-worker races | Docker not available |
+| End-to-end timeout → recon → selective retry | No Docker |
+
+### Explicitly out of scope (Phase 8)
+
+- Approval-reminder / expiration Lambdas (Phase 9)
+- React UI (Phase 10)
+- Observability dashboards (Phase 11)
+
+---
+
 ## Remaining (roadmap only — not started)
 
-8. Reconciliation · 9. Lambdas · 10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.
+9. Lambdas · 10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.

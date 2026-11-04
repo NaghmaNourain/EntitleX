@@ -54,4 +54,24 @@ public sealed class LicenseExtensionSagaRepository : ILicenseExtensionSagaReposi
             .Take(take)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<LicenseExtensionSaga>> ListRequiringReconciliationAsync(
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.LicenseExtensionSagas
+            .Include(x => x.Transitions)
+            .Include(x => x.ItemOutcomes)
+            .Where(x =>
+                x.State == SagaState.ReconciliationRequired
+                || x.ItemOutcomes.Any(o =>
+                    o.Status == SagaItemOutcomeStatus.Uncertain
+                    || (o.Status == SagaItemOutcomeStatus.Pending
+                        && (x.State == SagaState.Processing
+                            || x.State == SagaState.QueuedForFulfillment
+                            || x.State == SagaState.PartiallyCompleted))))
+            .OrderBy(x => x.UpdatedAtUtc)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+    }
 }

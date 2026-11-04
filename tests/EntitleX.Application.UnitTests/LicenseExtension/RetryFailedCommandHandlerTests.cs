@@ -331,6 +331,16 @@ public sealed class RetryFailedCommandHandlerTests
             int take,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<LicenseExtensionSaga>>([]);
+
+        public Task<IReadOnlyList<LicenseExtensionSaga>> ListRequiringReconciliationAsync(
+            int take,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<LicenseExtensionSaga>>(
+                _byRequest.Values
+                    .Where(s => s.State == SagaState.ReconciliationRequired
+                        || s.ItemOutcomes.Any(o => o.Status == SagaItemOutcomeStatus.Uncertain))
+                    .Take(take)
+                    .ToList());
     }
 
     private sealed class FakeApprovalRepository : IApprovalCaseRepository

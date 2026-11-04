@@ -5,8 +5,8 @@ using EntitleX.Domain.Saga;
 namespace EntitleX.Application.LicenseExtension.Retry;
 
 /// <summary>
-/// Phase 7 gate: blocks retry when the saga reports uncertain outcomes or
-/// <see cref="SagaState.ReconciliationRequired"/>. Full repair lives in Phase 8.
+/// Lightweight gate used by unit tests. Production registers
+/// <see cref="ReconciliationGate"/> which also checks the local fulfillment ledger.
 /// </summary>
 public sealed class StubReconciliationGate : IReconciliationGate
 {

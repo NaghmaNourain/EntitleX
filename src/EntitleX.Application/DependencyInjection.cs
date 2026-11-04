@@ -5,8 +5,8 @@ using EntitleX.Application.EntitlementAggregation;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Application.Fulfillment;
 using EntitleX.Application.LicenseExtension.Retry;
+using EntitleX.Application.Reconciliation;
 using EntitleX.Application.Saga;
-// IReconciliationGate registered to StubReconciliationGate (Phase 7 / Phase 8 port)
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -27,7 +27,8 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(assembly);
 
         services.AddScoped<IEntitlementAggregationService, EntitlementAggregationService>();
-        services.AddScoped<IReconciliationGate, StubReconciliationGate>();
+        services.AddScoped<IReconciliationGate, ReconciliationGate>();
+        services.AddScoped<IReconciliationService, ReconciliationService>();
         services.AddSagaOrchestration();
 
         return services;
@@ -41,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IFulfillmentOutboxService, FulfillmentOutboxService>();
         services.AddScoped<ILicenseExtensionSagaOrchestrator, LicenseExtensionSagaOrchestrator>();
         services.AddScoped<ISagaTimeoutHook, LoggingSagaTimeoutHook>();
+        services.AddScoped<IReconciliationService, ReconciliationService>();
         return services;
     }
 }
