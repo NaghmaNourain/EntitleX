@@ -1,8 +1,6 @@
 namespace EntitleX.Messaging;
 
-/// <summary>
-/// Marker type for messaging contracts and adapters (Phase 1 stub).
-/// </summary>
+/// <summary>Marker type for messaging contracts and transport adapters.</summary>
 public static class AssemblyMarker
 {
     public static string Name => "EntitleX.Messaging";

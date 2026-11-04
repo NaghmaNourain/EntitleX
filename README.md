@@ -2,7 +2,7 @@
 
 Enterprise license-extension platform (portfolio). Orchestrates extension requests across fictional vendor systems **CloudShield** and **NetworkGuard**. No proprietary IP.
 
-Phase 4 adds JWT/RBAC, day-band approval workflows, decision audit metadata, and notification emails with in-app links (Mailpit SMTP / LocalStack SES). See [docs/implementation-progress.md](docs/implementation-progress.md).
+Phase 5 adds the transactional outbox, LocalStack SQS, Kafka provider commands, and fulfillment workers. See [docs/implementation-progress.md](docs/implementation-progress.md) and [docs/event-contracts.md](docs/event-contracts.md).
 
 ## Architecture
 
@@ -11,9 +11,10 @@ Phase 4 adds JWT/RBAC, day-band approval workflows, decision audit metadata, and
 - **Approval case aggregate** with sequential, role-gated stages and `ApprovalVersion` / `ApprovedScopeHash`
 - **JWT Bearer + RBAC** (`RenewalRepresentative`, `RenewalManager`, `DealDeskManager`, `PlatformAdmin`)
 - **Entitlement aggregation** across CloudShield + NetworkGuard (partial results, correlation IDs)
+- **Transactional outbox** → SQS fulfillment → Kafka provider commands (partition key = entitlement id) → simulator results
 - **Vendor simulators** with own PostgreSQL databases and `AppliedLicenseOperation` claim semantics
 - **Notification emails** via Mailpit (SMTP) or LocalStack SES — app links only, no email approve buttons
-- **Separate workers** for async work (fulfillment, outbox, reconciliation, notifications)
+- **Workers**: OutboxPublisher, FulfillmentWorker (SQS + results), reconciliation/notification stubs
 - **Lambda stubs** for scheduled approval reminders and expiration notifications
 - Decision record: [docs/adr/0001-modular-api-vs-microservices.md](docs/adr/0001-modular-api-vs-microservices.md)
 
@@ -30,15 +31,19 @@ Phase 4 adds JWT/RBAC, day-band approval workflows, decision audit metadata, and
 dotnet restore EntitleX.sln
 dotnet build EntitleX.sln
 
-# Start local infrastructure (Postgres, Mailpit, LocalStack w/ SES, …)
+# Start local infrastructure (Postgres, Kafka, LocalStack SQS+SES, Mailpit, …)
 docker compose up -d
 
-# Vendor simulators (Development migrates + seeds demo data)
+# Vendor simulators (Development migrates + seeds demo data; Kafka consumers on)
 dotnet run --project src/simulators/CloudShield/CloudShield.Api    # :5081
 dotnet run --project src/simulators/NetworkGuard/NetworkGuard.Api  # :5082
 
 # Platform API (Development: JWT + MigrateOnStartup + Mailpit SMTP)
 dotnet run --project src/EntitleX.Api                             # :5080
+
+# Messaging workers (require Compose LocalStack SQS + Kafka)
+dotnet run --project src/workers/EntitleX.OutboxPublisher
+dotnet run --project src/workers/EntitleX.FulfillmentWorker
 
 # Optional: notification probe worker (same Email:* config)
 dotnet run --project src/workers/EntitleX.NotificationService
@@ -126,14 +131,18 @@ dotnet run --project src/workers/EntitleX.NotificationService
 | Service     | Ports                         | Notes                                      |
 |-------------|-------------------------------|--------------------------------------------|
 | Postgres    | `5432`                        | User/pass `entitlex` / `entitlex`          |
-| Kafka       | `9092`                        | KRaft single-node                          |
-| LocalStack  | `4566`                        | AWS emulator (includes **SES**)            |
+| Kafka       | `9092`                        | KRaft; auto-creates provider command/result topics |
+| LocalStack  | `4566`                        | SQS (`entitlex-fulfillment` + DLQ) + SES   |
 | Mailpit     | `1025` (SMTP), `8025` (UI)    | Dev email                                  |
 | Jaeger      | `16686` (UI), `4317`/`4318`   | OTLP collectors                            |
 | Prometheus  | `9090`                        | Metrics                                    |
 | Grafana     | `3001`                        | UI (`admin` / `admin`) — host 3001 → 3000  |
 
-Postgres init creates databases: `entitlex_platform`, `cloudshield`, `networkguard`.
+Postgres init creates databases: `entitlex_platform`, `cloudshield`, `networkguard`. LocalStack init creates SQS queues on ready.
+
+### Messaging path (after final approval)
+
+`OutboxMessage` (same PG txn) → OutboxPublisher → SQS `entitlex-fulfillment` → FulfillmentWorker → Kafka provider commands (key = entitlement id) → simulators → `entitlex.provider.results` → idempotent settlement.
 
 ## Health endpoints
 

@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\EntitleX.Infrastructure\EntitleX.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\EntitleX.Application\EntitleX.Application.csproj" />
+    <ProjectReference Include="..\..\src\EntitleX.Messaging\EntitleX.Messaging.csproj" />
   </ItemGroup>
 
 </Project>

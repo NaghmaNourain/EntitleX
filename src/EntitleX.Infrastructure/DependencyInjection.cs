@@ -2,9 +2,12 @@ using EntitleX.Application.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Infrastructure.Identity;
 using EntitleX.Infrastructure.Notifications;
+using EntitleX.Infrastructure.Outbox;
 using EntitleX.Infrastructure.Persistence;
 using EntitleX.Infrastructure.Persistence.Repositories;
 using EntitleX.Infrastructure.Providers;
+using EntitleX.Messaging;
+using EntitleX.Messaging.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +37,13 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EntitleXDbContext>());
         services.AddScoped<ILicenseExtensionRequestRepository, LicenseExtensionRequestRepository>();
         services.AddScoped<IApprovalCaseRepository, ApprovalCaseRepository>();
+        services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<OutboxClaimer>();
+        services.AddScoped<OutboxPublisherService>();
+        services.AddScoped<IConsumerIdempotencyStore, EfConsumerIdempotencyStore>();
+        services.AddScoped<ProviderResultProcessor>();
+
+        services.AddEntitleXMessaging(configuration);
 
         services.AddProviderHttpClients(configuration);
 
@@ -47,6 +57,37 @@ public static class DependencyInjection
             .Add(CreateProviderRegistration("cloudshield", "CloudShield"))
             .Add(CreateProviderRegistration("networkguard", "NetworkGuard"));
 
+        return services;
+    }
+
+    /// <summary>
+    /// Worker-friendly registration: platform DB + messaging transports without HTTP auth/email.
+    /// </summary>
+    public static IServiceCollection AddInfrastructureForWorkers(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("EntitleXPlatform")
+            ?? throw new InvalidOperationException(
+                "Connection string 'EntitleXPlatform' is not configured.");
+
+        services.AddDbContext<EntitleXDbContext>(options =>
+        {
+            options.UseNpgsql(connectionString, npgsql =>
+            {
+                npgsql.MigrationsHistoryTable("__ef_migrations_history", "public");
+                npgsql.MigrationsAssembly(typeof(EntitleXDbContext).Assembly.FullName);
+            });
+        });
+
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EntitleXDbContext>());
+        services.AddScoped<ILicenseExtensionRequestRepository, LicenseExtensionRequestRepository>();
+        services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<OutboxClaimer>();
+        services.AddScoped<OutboxPublisherService>();
+        services.AddScoped<IConsumerIdempotencyStore, EfConsumerIdempotencyStore>();
+        services.AddScoped<ProviderResultProcessor>();
+        services.AddEntitleXMessaging(configuration);
         return services;
     }
 

@@ -80,7 +80,7 @@
 
 ---
 
-## Phase 4 — Approvals + JWT/RBAC (current)
+## Phase 4 — Approvals + JWT/RBAC
 
 **Status:** Complete on branch `cursor/phase-4-approvals-bc4f` (based on Phase 3)
 
@@ -144,6 +144,66 @@
 
 ---
 
+## Phase 5 — Outbox / SQS / Kafka fulfillment (current)
+
+**Status:** Complete on branch `cursor/phase-5-messaging-bc4f` (based on Phase 4)
+
+### Verified
+
+| Item | Result |
+|------|--------|
+| `dotnet build EntitleX.sln` | Succeeds (0 warnings, 0 errors) |
+| Domain / application / infrastructure unit tests | Passed (includes fulfillment transitions, outbox enqueue, envelope round-trip, idempotent approval→outbox) |
+| Integration tests (Testcontainers) | Skip without Docker (`DockerFact`) — cover outbox txn persist, SKIP LOCKED claim, consumer idempotency |
+| EF migration `OutboxMessaging` | `outbox_messages`, `processed_messages`, `fulfillment_item_results` |
+| `docker compose config` | Not re-validated here (no Docker CLI); Compose updated with SQS init + Kafka health |
+
+### Delivered in Phase 5
+
+**Transactional outbox**
+
+- `OutboxMessage` persisted in the same Postgres unit of work as final approval
+- Auto-approve (create) and final human approval both enqueue `entitlex.fulfillment.command` and transition request → `InFulfillment`
+- Envelope fields: schema version, message/correlation/causation/request/logical-operation ids
+
+**OutboxPublisher worker**
+
+- `FOR UPDATE SKIP LOCKED` batch claim (also reclaims stale `Processing` locks)
+- Publishes to SQS or Kafka per destination kind
+- Exponential retry + poison after max attempts
+- `IOutboxMetrics` logging hooks
+- Graceful shutdown via host cancellation
+
+**Fulfillment pipeline**
+
+- SQS `entitlex-fulfillment` (+ DLQ `entitlex-fulfillment-dlq`, visibility timeout, maxReceiveCount 5)
+- FulfillmentWorker: idempotent SQS consumer → Kafka provider commands (partition key = entitlement id)
+- CloudShield / NetworkGuard hosted Kafka consumers apply extensions and emit completion/failure to `entitlex.provider.results`
+- Platform Kafka results consumer records outcomes idempotently and settles request status when all items report
+
+**Local infrastructure**
+
+- Compose: LocalStack SQS init script, Kafka auto-create topics + healthcheck
+- Contracts notes: `docs/event-contracts.md`
+
+### Unverified in this environment
+
+| Item | Reason |
+|------|--------|
+| Live LocalStack SQS publish/consume | No Docker |
+| Live Kafka end-to-end (worker → simulators → results) | No Docker |
+| Testcontainers outbox / SKIP LOCKED / idempotency tests | Docker not available; tests auto-skip |
+| `docker compose config` / compose up | No Docker CLI |
+
+### Explicitly out of scope (Phase 5)
+
+- Full saga state machine (Phase 6)
+- Selective retry factories (Phase 7)
+- Reconciliation worker (Phase 8)
+- React UI (Phase 10)
+
+---
+
 ## Remaining (roadmap only — not started)
 
-5. Outbox/SQS/Kafka · 6. Saga · 7. Selective retry · 8. Reconciliation · 9. Lambdas · 10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.
+6. Saga · 7. Selective retry · 8. Reconciliation · 9. Lambdas · 10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.
