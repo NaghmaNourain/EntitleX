@@ -1,0 +1,25 @@
+using EntitleX.BuildingBlocks.Ids;
+using EntitleX.Domain.Saga;
+
+namespace EntitleX.Application.Abstractions;
+
+public interface ILicenseExtensionSagaRepository
+{
+    Task AddAsync(LicenseExtensionSaga saga, CancellationToken cancellationToken = default);
+
+    Task<LicenseExtensionSaga?> GetByRequestIdAsync(
+        RequestId requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<LicenseExtensionSaga?> GetByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sagas with an elapsed timeout deadline (hook scan for workers/lambdas).
+    /// </summary>
+    Task<IReadOnlyList<LicenseExtensionSaga>> ListTimedOutAsync(
+        DateTimeOffset nowUtc,
+        int take,
+        CancellationToken cancellationToken = default);
+}

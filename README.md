@@ -2,16 +2,18 @@
 
 Enterprise license-extension platform (portfolio). Orchestrates extension requests across fictional vendor systems **CloudShield** and **NetworkGuard**. No proprietary IP.
 
-Phase 5 adds the transactional outbox, LocalStack SQS, Kafka provider commands, and fulfillment workers. See [docs/implementation-progress.md](docs/implementation-progress.md) and [docs/event-contracts.md](docs/event-contracts.md).
+Phase 6 adds the durable centralized saga (forward recovery). See [docs/implementation-progress.md](docs/implementation-progress.md), [docs/saga-workflow.md](docs/saga-workflow.md), and [docs/event-contracts.md](docs/event-contracts.md).
 
 ## Architecture
 
 - **Modular control-plane API** (`EntitleX.Api`) with Clean Architecture layers
 - **DDD request aggregate** (`LicenseExtensionRequest` + items) with invariant-enforcing methods
+- **Durable saga** (`LicenseExtensionSaga`) with transition history, item outcomes, timeout hooks; request `InFulfillment` maps to saga `QueuedForFulfillment`/`Processing`
+- **Forward recovery only** — never compensate successful license extensions when siblings fail
 - **Approval case aggregate** with sequential, role-gated stages and `ApprovalVersion` / `ApprovedScopeHash`
 - **JWT Bearer + RBAC** (`RenewalRepresentative`, `RenewalManager`, `DealDeskManager`, `PlatformAdmin`)
 - **Entitlement aggregation** across CloudShield + NetworkGuard (partial results, correlation IDs)
-- **Transactional outbox** → SQS fulfillment → Kafka provider commands (partition key = entitlement id) → simulator results
+- **Transactional outbox** → SQS fulfillment → Kafka provider commands (partition key = entitlement id) → simulator results → saga settlement
 - **Vendor simulators** with own PostgreSQL databases and `AppliedLicenseOperation` claim semantics
 - **Notification emails** via Mailpit (SMTP) or LocalStack SES — app links only, no email approve buttons
 - **Workers**: OutboxPublisher, FulfillmentWorker (SQS + results), reconciliation/notification stubs

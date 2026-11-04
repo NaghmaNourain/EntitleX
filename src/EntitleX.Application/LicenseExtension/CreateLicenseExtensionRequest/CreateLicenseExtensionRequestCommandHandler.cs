@@ -13,22 +13,22 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
 {
     private readonly ILicenseExtensionRequestRepository _repository;
     private readonly IApprovalCaseRepository _approvalRepository;
+    private readonly ILicenseExtensionSagaOrchestrator _sagaOrchestrator;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IApprovalNotificationService _notifications;
-    private readonly IFulfillmentOutboxService _fulfillmentOutbox;
 
     public CreateLicenseExtensionRequestCommandHandler(
         ILicenseExtensionRequestRepository repository,
         IApprovalCaseRepository approvalRepository,
+        ILicenseExtensionSagaOrchestrator sagaOrchestrator,
         IUnitOfWork unitOfWork,
-        IApprovalNotificationService notifications,
-        IFulfillmentOutboxService fulfillmentOutbox)
+        IApprovalNotificationService notifications)
     {
         _repository = repository;
         _approvalRepository = approvalRepository;
+        _sagaOrchestrator = sagaOrchestrator;
         _unitOfWork = unitOfWork;
         _notifications = notifications;
-        _fulfillmentOutbox = fulfillmentOutbox;
     }
 
     public async Task<LicenseExtensionRequestDto> Handle(
@@ -64,9 +64,11 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
 
         ApplyInitialApprovalTransition(aggregate, band);
 
+        await _sagaOrchestrator.StartForRequestAsync(aggregate, band, cancellationToken: cancellationToken);
+
         if (aggregate.Status == LicenseExtensionRequestStatus.Approved)
         {
-            await _fulfillmentOutbox.EnqueueAfterFinalApprovalAsync(
+            await _sagaOrchestrator.DispatchFulfillmentAsync(
                 aggregate,
                 correlationId: null,
                 causationId: null,

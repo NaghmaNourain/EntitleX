@@ -5,6 +5,7 @@ using EntitleX.BuildingBlocks.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Identity;
 using EntitleX.Domain.LicenseExtension;
+using EntitleX.Domain.Saga;
 
 namespace EntitleX.Application.UnitTests.Approval;
 
@@ -15,18 +16,18 @@ public sealed class DecideApprovalCommandHandlerTests
     [Fact]
     public async Task Handle_WhenActorLacksStageRole_ThrowsForbidden()
     {
-        var (request, approval) = CreatePendingRmCase(days: 60);
-        var outbox = new FakeFulfillmentOutbox();
+        var (request, approval, saga) = CreatePendingRmCase(days: 60);
+        var orchestrator = new FakeSagaOrchestrator(saga);
         var handler = new DecideApprovalCommandHandler(
             new FakeRequestRepository(request),
             new FakeApprovalRepository(approval),
+            orchestrator,
             new FakeUnitOfWork(),
             new FakeCurrentUser(
                 "user-dd-001",
                 "Dana",
                 [EntitleXRoles.DealDeskManager]),
-            new NoopNotifications(),
-            outbox);
+            new NoopNotifications());
 
         var ex = await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(
@@ -36,24 +37,24 @@ public sealed class DecideApprovalCommandHandlerTests
         Assert.Contains("RenewalManager", ex.Message, StringComparison.Ordinal);
         Assert.Equal(LicenseExtensionRequestStatus.PendingApproval, request.Status);
         Assert.Equal(ApprovalCaseStatus.Pending, approval.Status);
-        Assert.Equal(0, outbox.EnqueueCount);
+        Assert.Equal(0, orchestrator.DispatchCount);
     }
 
     [Fact]
-    public async Task Handle_WhenRenewalManagerApproves_EnqueuesFulfillmentOutbox()
+    public async Task Handle_WhenRenewalManagerApproves_DispatchesFulfillmentViaSaga()
     {
-        var (request, approval) = CreatePendingRmCase(days: 60);
-        var outbox = new FakeFulfillmentOutbox();
+        var (request, approval, saga) = CreatePendingRmCase(days: 60);
+        var orchestrator = new FakeSagaOrchestrator(saga);
         var handler = new DecideApprovalCommandHandler(
             new FakeRequestRepository(request),
             new FakeApprovalRepository(approval),
+            orchestrator,
             new FakeUnitOfWork(),
             new FakeCurrentUser(
                 "user-rm-001",
                 "Morgan",
                 [EntitleXRoles.RenewalManager]),
-            new NoopNotifications(),
-            outbox);
+            new NoopNotifications());
 
         var dto = await handler.Handle(
             new DecideApprovalCommand(request.Id.Value, "Approved", "lgtm", "corr-9"),
@@ -63,10 +64,12 @@ public sealed class DecideApprovalCommandHandlerTests
         Assert.Equal(LicenseExtensionRequestStatus.InFulfillment, request.Status);
         Assert.Equal(1, request.ApprovalVersion);
         Assert.False(string.IsNullOrWhiteSpace(request.ApprovedScopeHash));
-        Assert.Equal(1, outbox.EnqueueCount);
+        Assert.Equal(1, orchestrator.DispatchCount);
+        Assert.Equal(SagaState.QueuedForFulfillment, saga.State);
     }
 
-    private static (LicenseExtensionRequest Request, ApprovalCase Approval) CreatePendingRmCase(int days)
+    private static (LicenseExtensionRequest Request, ApprovalCase Approval, LicenseExtensionSaga Saga)
+        CreatePendingRmCase(int days)
     {
         var request = LicenseExtensionRequest.CreateFresh(
             "EXT-APP-1",
@@ -86,7 +89,8 @@ public sealed class DecideApprovalCommandHandlerTests
             days,
             ApprovalBand.RenewalManagerOnly);
 
-        return (request, approval);
+        var saga = LicenseExtensionSaga.Start(request.Id, ApprovalBand.RenewalManagerOnly);
+        return (request, approval, saga);
     }
 
     private sealed class FakeRequestRepository(LicenseExtensionRequest request)
@@ -157,19 +161,85 @@ public sealed class DecideApprovalCommandHandlerTests
             CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
-    private sealed class FakeFulfillmentOutbox : IFulfillmentOutboxService
+    private sealed class FakeSagaOrchestrator(LicenseExtensionSaga saga) : ILicenseExtensionSagaOrchestrator
     {
-        public int EnqueueCount { get; private set; }
+        public int DispatchCount { get; private set; }
 
-        public Task EnqueueAfterFinalApprovalAsync(
+        public Task<LicenseExtensionSaga> StartForRequestAsync(
+            LicenseExtensionRequest request,
+            ApprovalBand band,
+            string? correlationId = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(saga);
+
+        public Task OnApprovalDecisionAsync(
+            LicenseExtensionRequest request,
+            ApprovalCase approvalCase,
+            ApprovalDecision decision,
+            string? correlationId = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (decision.Outcome == ApprovalDecisionOutcome.Rejected)
+            {
+                saga.RecordRejection(decision.ActorUserId, correlationId, decision.Comment);
+                return Task.CompletedTask;
+            }
+
+            if (decision.StageRole == ApprovalStageRole.RenewalManager)
+            {
+                saga.RecordRenewalManagerApproval(decision.ActorUserId, correlationId);
+            }
+            else if (decision.StageRole == ApprovalStageRole.DealDeskManager)
+            {
+                saga.RecordDealDeskApproval(decision.ActorUserId, correlationId);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task OnRejectedWithoutDecisionAsync(
+            LicenseExtensionRequest request,
+            string reason,
+            string? correlationId = null,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task DispatchFulfillmentAsync(
             LicenseExtensionRequest request,
             Guid? correlationId = null,
             Guid? causationId = null,
             CancellationToken cancellationToken = default)
         {
             request.BeginFulfillment();
-            EnqueueCount++;
+            saga.QueueFulfillment(request.Items.Select(i => (
+                i.Id,
+                i.EntitlementId,
+                i.LogicalOperationId)));
+            DispatchCount++;
             return Task.CompletedTask;
         }
+
+        public Task OnFulfillmentDispatchedAsync(
+            RequestId requestId,
+            string? correlationId = null,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task OnItemCompletedAsync(
+            RequestId requestId,
+            LogicalOperationId logicalOperationId,
+            string? correlationId = null,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task OnItemFailedAsync(
+            RequestId requestId,
+            LogicalOperationId logicalOperationId,
+            string? errorCode,
+            string? errorMessage,
+            string? correlationId = null,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task ApplyElapsedTimeoutsAsync(
+            DateTimeOffset nowUtc,
+            int take = 50,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

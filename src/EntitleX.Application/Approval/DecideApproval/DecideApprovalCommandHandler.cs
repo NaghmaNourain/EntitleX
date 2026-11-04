@@ -13,25 +13,25 @@ public sealed class DecideApprovalCommandHandler
 {
     private readonly ILicenseExtensionRequestRepository _requestRepository;
     private readonly IApprovalCaseRepository _approvalRepository;
+    private readonly ILicenseExtensionSagaOrchestrator _sagaOrchestrator;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUser _currentUser;
     private readonly IApprovalNotificationService _notifications;
-    private readonly IFulfillmentOutboxService _fulfillmentOutbox;
 
     public DecideApprovalCommandHandler(
         ILicenseExtensionRequestRepository requestRepository,
         IApprovalCaseRepository approvalRepository,
+        ILicenseExtensionSagaOrchestrator sagaOrchestrator,
         IUnitOfWork unitOfWork,
         ICurrentUser currentUser,
-        IApprovalNotificationService notifications,
-        IFulfillmentOutboxService fulfillmentOutbox)
+        IApprovalNotificationService notifications)
     {
         _requestRepository = requestRepository;
         _approvalRepository = approvalRepository;
+        _sagaOrchestrator = sagaOrchestrator;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _notifications = notifications;
-        _fulfillmentOutbox = fulfillmentOutbox;
     }
 
     public async Task<ApprovalCaseDto> Handle(
@@ -76,13 +76,20 @@ public sealed class DecideApprovalCommandHandler
             throw new ForbiddenException(ex.Message);
         }
 
+        await _sagaOrchestrator.OnApprovalDecisionAsync(
+            request,
+            approvalCase,
+            decision,
+            command.CorrelationId,
+            cancellationToken);
+
         if (approvalCase.Status == ApprovalCaseStatus.Approved)
         {
             request.RecordApproval(ApprovedScopeHasher.Compute(request));
             var correlation = Guid.TryParse(command.CorrelationId, out var parsed)
                 ? parsed
                 : (Guid?)null;
-            await _fulfillmentOutbox.EnqueueAfterFinalApprovalAsync(
+            await _sagaOrchestrator.DispatchFulfillmentAsync(
                 request,
                 correlation,
                 causationId: null,

@@ -1,3 +1,4 @@
+using EntitleX.Application.Abstractions;
 using EntitleX.BuildingBlocks.Ids;
 using EntitleX.Messaging.Abstractions;
 using EntitleX.Messaging.Contracts;
@@ -8,11 +9,13 @@ namespace EntitleX.FulfillmentWorker;
 
 /// <summary>
 /// Turns a fulfillment command into per-item Kafka provider commands
-/// (partition key = entitlement id).
+/// (partition key = entitlement id) and advances the saga to Processing.
 /// </summary>
 public sealed class FulfillmentCommandProcessor(
     IKafkaMessagePublisher kafka,
     IConsumerIdempotencyStore idempotency,
+    ILicenseExtensionSagaOrchestrator sagaOrchestrator,
+    IUnitOfWork unitOfWork,
     IOptions<MessagingOptions> options,
     ILogger<FulfillmentCommandProcessor> logger)
 {
@@ -79,6 +82,12 @@ public sealed class FulfillmentCommandProcessor(
                 topic,
                 item.LogicalOperationId);
         }
+
+        await sagaOrchestrator.OnFulfillmentDispatchedAsync(
+            RequestId.From(command.RequestId),
+            envelope.CorrelationId?.ToString("D"),
+            cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     private static string ResolveTopic(string provider, KafkaOptions kafka) =>

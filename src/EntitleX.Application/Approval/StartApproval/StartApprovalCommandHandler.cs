@@ -13,17 +13,20 @@ public sealed class StartApprovalCommandHandler
 {
     private readonly ILicenseExtensionRequestRepository _requestRepository;
     private readonly IApprovalCaseRepository _approvalRepository;
+    private readonly ILicenseExtensionSagaOrchestrator _sagaOrchestrator;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IApprovalNotificationService _notifications;
 
     public StartApprovalCommandHandler(
         ILicenseExtensionRequestRepository requestRepository,
         IApprovalCaseRepository approvalRepository,
+        ILicenseExtensionSagaOrchestrator sagaOrchestrator,
         IUnitOfWork unitOfWork,
         IApprovalNotificationService notifications)
     {
         _requestRepository = requestRepository;
         _approvalRepository = approvalRepository;
+        _sagaOrchestrator = sagaOrchestrator;
         _unitOfWork = unitOfWork;
         _notifications = notifications;
     }
@@ -79,6 +82,22 @@ public sealed class StartApprovalCommandHandler
         else if (band == ApprovalBand.Unsupported)
         {
             request.Reject();
+        }
+
+        await _sagaOrchestrator.StartForRequestAsync(
+            request,
+            band,
+            command.CorrelationId,
+            cancellationToken);
+
+        if (band == ApprovalBand.AutoApprove &&
+            request.Status == LicenseExtensionRequestStatus.Approved)
+        {
+            await _sagaOrchestrator.DispatchFulfillmentAsync(
+                request,
+                correlationId: null,
+                causationId: null,
+                cancellationToken);
         }
 
         await _approvalRepository.AddAsync(approvalCase, cancellationToken);

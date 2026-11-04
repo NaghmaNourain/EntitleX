@@ -302,6 +302,185 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                     b.ToTable("license_extension_request_items", "public");
                 });
 
+            modelBuilder.Entity("EntitleX.Domain.Saga.LicenseExtensionSaga", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ApprovalBand")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("approval_band");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<bool>("DealDeskApproved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("deal_desk_approved");
+
+                    b.Property<bool>("RenewalManagerApproved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("renewal_manager_approved");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<bool>("RequiresDealDesk")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_deal_desk");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTimeOffset?>("TimeoutDeadlineUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("timeout_deadline_utc");
+
+                    b.Property<string>("TimeoutKind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("timeout_kind");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_license_extension_sagas_request_id");
+
+                    b.HasIndex("State")
+                        .HasDatabaseName("ix_license_extension_sagas_state");
+
+                    b.HasIndex("TimeoutDeadlineUtc")
+                        .HasDatabaseName("ix_license_extension_sagas_timeout_deadline_utc");
+
+                    b.ToTable("license_extension_sagas", "public");
+                });
+
+            modelBuilder.Entity("EntitleX.Domain.Saga.SagaItemOutcome", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("EntitlementId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("entitlement_id");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("error_code");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("error_message");
+
+                    b.Property<Guid>("LogicalOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("logical_operation_id");
+
+                    b.Property<Guid>("RequestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_item_id");
+
+                    b.Property<Guid>("SagaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LogicalOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_saga_item_outcomes_logical_operation_id");
+
+                    b.HasIndex("SagaId")
+                        .HasDatabaseName("ix_saga_item_outcomes_saga_id");
+
+                    b.ToTable("saga_item_outcomes", "public");
+                });
+
+            modelBuilder.Entity("EntitleX.Domain.Saga.SagaTransition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Actor")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("FromState")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("from_state");
+
+                    b.Property<string>("Metadata")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("metadata");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("SagaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ToState")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("to_state");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAtUtc")
+                        .HasDatabaseName("ix_saga_transitions_occurred_at_utc");
+
+                    b.HasIndex("SagaId")
+                        .HasDatabaseName("ix_saga_transitions_saga_id");
+
+                    b.ToTable("saga_transitions", "public");
+                });
+
             modelBuilder.Entity("EntitleX.Infrastructure.Outbox.FulfillmentItemResult", b =>
                 {
                     b.Property<Guid>("Id")
@@ -534,6 +713,24 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EntitleX.Domain.Saga.SagaItemOutcome", b =>
+                {
+                    b.HasOne("EntitleX.Domain.Saga.LicenseExtensionSaga", null)
+                        .WithMany("ItemOutcomes")
+                        .HasForeignKey("SagaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EntitleX.Domain.Saga.SagaTransition", b =>
+                {
+                    b.HasOne("EntitleX.Domain.Saga.LicenseExtensionSaga", null)
+                        .WithMany("Transitions")
+                        .HasForeignKey("SagaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("EntitleX.Domain.Approval.ApprovalCase", b =>
                 {
                     b.Navigation("Decisions");
@@ -544,6 +741,13 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("EntitleX.Domain.LicenseExtension.LicenseExtensionRequest", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("EntitleX.Domain.Saga.LicenseExtensionSaga", b =>
+                {
+                    b.Navigation("ItemOutcomes");
+
+                    b.Navigation("Transitions");
                 });
 #pragma warning restore 612, 618
         }

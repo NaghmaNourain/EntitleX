@@ -144,7 +144,7 @@
 
 ---
 
-## Phase 5 — Outbox / SQS / Kafka fulfillment (current)
+## Phase 5 — Outbox / SQS / Kafka fulfillment
 
 **Status:** Complete on branch `cursor/phase-5-messaging-bc4f` (based on Phase 4)
 
@@ -204,6 +204,53 @@
 
 ---
 
+## Phase 6 — Durable saga / forward recovery (current)
+
+**Status:** Complete on branch `cursor/phase-6-saga-bc4f` (based on Phase 5)
+
+### Verified
+
+| Item | Result |
+|------|--------|
+| `dotnet build EntitleX.sln` | Succeeds (0 warnings, 0 errors) |
+| Domain unit tests | Include saga transition graph, approval ordering, timeout hooks, status aggregation under partial failure |
+| Application unit tests | Approval decision → saga dispatch path |
+| EF migration `SagaOrchestration` | `license_extension_sagas`, `saga_transitions`, `saga_item_outcomes` |
+| Docs | `docs/saga-workflow.md` (forward recovery rationale + `InFulfillment` mapping) |
+
+### Delivered in Phase 6
+
+**Centralized saga (`LicenseExtensionSaga`)**
+
+- States: `Requested`, `PendingRenewalManagerApproval`, `PendingDealDeskApproval`, `Approved`, `QueuedForFulfillment`, `Processing`, `PartiallyCompleted`, `Completed`, `Failed`, `ReconciliationRequired`, `Escalated`, `Rejected`
+- Request status `InFulfillment` maps to saga `QueuedForFulfillment` + `Processing` (documented; no duplicate saga enum value)
+- Persisted transition history + per-item outcomes
+- Validated transition graph; RM → Deal Desk ordering enforced
+- Dispatch fulfillment via existing outbox; FulfillmentWorker marks `Processing`; results consumer updates outcomes and aggregates
+- Timeout hooks (`ApprovalPending` → Escalated; `FulfillmentProcessing` → ReconciliationRequired)
+- **Forward recovery only** — successful extensions are never compensated
+
+**API**
+
+- `GET /api/v1/license-extension-requests/{id}/saga`
+
+### Unverified in this environment
+
+| Item | Reason |
+|------|--------|
+| Live end-to-end saga against Compose Postgres/SQS/Kafka | No Docker |
+| Testcontainers saga persistence | Docker not available; tests auto-skip |
+| Lambda-scheduled timeout firing | Phase 9 |
+
+### Explicitly out of scope (Phase 6)
+
+- Selective retry factories (Phase 7)
+- Full reconciliation worker repair loop (Phase 8)
+- Approval-reminder / expiration Lambdas (Phase 9)
+- React UI (Phase 10)
+
+---
+
 ## Remaining (roadmap only — not started)
 
-6. Saga · 7. Selective retry · 8. Reconciliation · 9. Lambdas · 10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.
+7. Selective retry · 8. Reconciliation · 9. Lambdas · 10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.
