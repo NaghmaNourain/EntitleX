@@ -30,4 +30,8 @@ public static class AuditEventTypes
     public const string ReconciliationItemStillUnknown = "Reconciliation.ItemStillUnknown";
     public const string ReconciliationMismatchDetected = "Reconciliation.MismatchDetected";
     public const string ReconciliationBatchCompleted = "Reconciliation.BatchCompleted";
+
+    public const string ApprovalReminderSent = "Approval.ReminderSent";
+    public const string ApprovalReminderEscalated = "Approval.ReminderEscalated";
+    public const string ExpirationNotificationSent = "Expiration.NotificationSent";
 }

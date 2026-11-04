@@ -1,6 +1,7 @@
 using EntitleX.Application;
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
+using EntitleX.Application.Notifications;
 using EntitleX.Infrastructure.Audit;
 using EntitleX.Infrastructure.Identity;
 using EntitleX.Infrastructure.Notifications;
@@ -47,6 +48,8 @@ public static class DependencyInjection
         services.AddScoped<IConsumerIdempotencyStore, EfConsumerIdempotencyStore>();
         services.AddScoped<IRetryClaimStore, EfRetryClaimStore>();
         services.AddScoped<IAuditEventStore, EfAuditEventStore>();
+        services.AddScoped<IApprovalReminderStore, EfApprovalReminderStore>();
+        services.AddScoped<IExpirationNotificationStore, EfExpirationNotificationStore>();
         services.AddScoped<ILocalFulfillmentOutcomeStore, EfLocalFulfillmentOutcomeStore>();
         services.AddScoped<ProviderResultProcessor>();
 
@@ -61,6 +64,7 @@ public static class DependencyInjection
 
         services.AddEntitleXAuthentication(configuration);
         services.AddEntitleXEmail(configuration);
+        services.AddScheduledNotificationJobs(configuration);
 
         services.AddHealthChecks()
             .Add(CreateProviderRegistration("cloudshield", "CloudShield"))
@@ -97,6 +101,8 @@ public static class DependencyInjection
         services.AddScoped<OutboxPublisherService>();
         services.AddScoped<IConsumerIdempotencyStore, EfConsumerIdempotencyStore>();
         services.AddScoped<IAuditEventStore, EfAuditEventStore>();
+        services.AddScoped<IApprovalReminderStore, EfApprovalReminderStore>();
+        services.AddScoped<IExpirationNotificationStore, EfExpirationNotificationStore>();
         services.AddScoped<ILocalFulfillmentOutcomeStore, EfLocalFulfillmentOutcomeStore>();
         services.AddScoped<ProviderResultProcessor>();
         services.AddProviderHttpClients(configuration);
@@ -107,11 +113,50 @@ public static class DependencyInjection
         return services;
     }
 
+    /// <summary>
+    /// Lambda / scheduled-job registration: platform DB + email (SMTP/Mailpit or SES) +
+    /// provider discovery clients + reminder/expiration services. No JWT.
+    /// </summary>
+    public static IServiceCollection AddInfrastructureForLambdas(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("EntitleXPlatform")
+            ?? throw new InvalidOperationException(
+                "Connection string 'EntitleXPlatform' is not configured.");
+
+        services.AddDbContext<EntitleXDbContext>(options =>
+        {
+            options.UseNpgsql(connectionString, npgsql =>
+            {
+                npgsql.MigrationsHistoryTable("__ef_migrations_history", "public");
+                npgsql.MigrationsAssembly(typeof(EntitleXDbContext).Assembly.FullName);
+            });
+        });
+
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EntitleXDbContext>());
+        services.AddScoped<ILicenseExtensionRequestRepository, LicenseExtensionRequestRepository>();
+        services.AddScoped<IApprovalCaseRepository, ApprovalCaseRepository>();
+        services.AddScoped<ILicenseExtensionSagaRepository, LicenseExtensionSagaRepository>();
+        services.AddScoped<IAuditEventStore, EfAuditEventStore>();
+        services.AddScoped<IApprovalReminderStore, EfApprovalReminderStore>();
+        services.AddScoped<IExpirationNotificationStore, EfExpirationNotificationStore>();
+
+        services.AddProviderHttpClients(configuration);
+        services.AddTransient<IProviderEntitlementClient, CloudShieldEntitlementClient>();
+        services.AddTransient<IProviderEntitlementClient, NetworkGuardEntitlementClient>();
+
+        services.AddEntitleXEmail(configuration);
+        services.AddScheduledNotificationJobs(configuration);
+        return services;
+    }
+
     public static IServiceCollection AddEntitleXEmail(
         this IServiceCollection services,
         IConfiguration configuration)
     {
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+        services.Configure<EmailPortalOptions>(configuration.GetSection(EmailPortalOptions.SectionName));
 
         var provider = configuration.GetValue<string>($"{EmailOptions.SectionName}:Provider")
             ?? "Smtp";
@@ -126,6 +171,19 @@ public static class DependencyInjection
         }
 
         services.AddScoped<IApprovalNotificationService, ApprovalNotificationService>();
+        return services;
+    }
+
+    public static IServiceCollection AddScheduledNotificationJobs(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<ApprovalReminderOptions>(
+            configuration.GetSection(ApprovalReminderOptions.SectionName));
+        services.Configure<ExpirationNotificationOptions>(
+            configuration.GetSection(ExpirationNotificationOptions.SectionName));
+        services.AddScoped<IApprovalReminderService, ApprovalReminderService>();
+        services.AddScoped<IExpirationNotificationService, ExpirationNotificationService>();
         return services;
     }
 

@@ -552,16 +552,42 @@ public sealed class LicenseExtensionSaga : AggregateRoot
         string? correlationId = null,
         DateTimeOffset? atUtc = null)
     {
-        EnsureNotTerminal();
+        ApplyConfiguredTerminalState(
+            SagaState.Escalated,
+            reason,
+            actor,
+            correlationId,
+            atUtc);
+    }
+
+    /// <summary>
+    /// Moves the saga to a configured terminal/escalation state after a stalled
+    /// approval reminder. The target is supplied by host configuration (not a
+    /// hardcoded historical name in the reminder Lambda).
+    /// Idempotent when already in the target state.
+    /// </summary>
+    public void ApplyConfiguredTerminalState(
+        SagaState terminalState,
+        string reason,
+        string? actor = null,
+        string? correlationId = null,
+        DateTimeOffset? atUtc = null)
+    {
         var now = atUtc ?? DateTimeOffset.UtcNow;
 
-        if (State is SagaState.Completed or SagaState.Failed or SagaState.Rejected or SagaState.Escalated)
+        if (State == terminalState)
         {
-            throw new DomainException($"Cannot escalate saga in state '{State}'.");
+            ClearTimeout(now);
+            return;
+        }
+
+        if (State is SagaState.Completed or SagaState.Failed or SagaState.Rejected)
+        {
+            throw new DomainException($"Cannot apply terminal state '{terminalState}' from '{State}'.");
         }
 
         TransitionTo(
-            SagaState.Escalated,
+            terminalState,
             reason,
             actor,
             correlationId,

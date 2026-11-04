@@ -355,6 +355,11 @@ public sealed class RetryFailedCommandHandlerTests
 
         public Task<ApprovalCase?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult<ApprovalCase?>(null);
+
+        public Task<IReadOnlyList<ApprovalCase>> ListPendingAsync(
+            int take,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ApprovalCase>>([]);
     }
 
     private sealed class RecordingSagaOrchestrator : ILicenseExtensionSagaOrchestrator
@@ -464,6 +469,18 @@ public sealed class RetryFailedCommandHandlerTests
             LicenseExtensionRequest request,
             ApprovalCase approvalCase,
             ApprovalDecision decision,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task NotifyApprovalReminderAsync(
+            LicenseExtensionRequest request,
+            ApprovalCase approvalCase,
+            ApprovalStage stage,
+            TimeSpan pendingFor,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task NotifyExpirationWarningAsync(
+            EntitleX.Application.EntitlementAggregation.Models.NormalizedEntitlementDto entitlement,
+            string portalLink,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

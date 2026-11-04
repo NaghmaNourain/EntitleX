@@ -306,7 +306,7 @@
 
 ---
 
-## Phase 8 — Reconciliation / failure repair (current)
+## Phase 8 — Reconciliation / failure repair
 
 **Status:** Complete on branch `cursor/phase-8-reconciliation-bc4f` (based on Phase 7)
 
@@ -354,6 +354,59 @@
 
 ---
 
+## Phase 9 — Approval reminder + expiration Lambdas (current)
+
+**Status:** Complete on branch `cursor/phase-9-lambdas-bc4f` (based on Phase 8)
+
+### Verified
+
+| Item | Result |
+|------|--------|
+| `dotnet build EntitleX.sln` | Succeeds (0 warnings, 0 errors) |
+| Domain unit tests | **66 passed** (includes reminder policy + configured terminal-state idempotency) |
+| Application unit tests | **25 passed** (includes reminder/escalation idempotency + expiry window dedupe + per-provider thresholds) |
+| Infrastructure / CloudShield unit tests | **3 + 3 passed** |
+| EF migration `ScheduledNotifications` | `approval_reminder_records`, `expiration_notification_records` |
+| Docs | `docs/lambdas.md`, `infra/eventbridge/schedules.stub.json` |
+
+### Delivered in Phase 9
+
+**ApprovalReminder Lambda / local host**
+
+- Pending approval stage ≥ `ApprovalReminder:PendingThresholdDays` (default 7) → email responsible role mailbox (deep link)
+- Persist reminder in `approval_reminder_records` (unique window / case+stage) — idempotent
+- After `EscalationDelayHours` (default 24) apply **`ApprovalReminder:TerminalSagaState`** (default `Escalated`, configurable — not hardcoded in the job)
+- SES or Mailpit via shared `Email:*` wiring (`AddInfrastructureForLambdas`)
+- Local: `dotnet run --project src/lambdas/EntitleX.ApprovalReminder`
+
+**ExpirationNotification Lambda / local host**
+
+- CloudShield cadence 24h / NetworkGuard 7d (`--provider` filter for schedule stubs)
+- Configurable warning thresholds per provider
+- Emails Renewal Representatives with customer, product, entitlement ref, expiry, portal link
+- Dedupe via `expiration_notification_records.window_key` (day or ISO-week bucket)
+- Local: `dotnet run --project src/lambdas/EntitleX.ExpirationNotification -- --provider CloudShield`
+
+**EventBridge**
+
+- Schedule stubs documented in `docs/lambdas.md` and `infra/eventbridge/schedules.stub.json` (Terraform packaging → Phase 12)
+
+### Unverified in this environment
+
+| Item | Reason |
+|------|--------|
+| Live Mailpit / LocalStack SES delivery from lambdas | No Docker |
+| Live provider discovery for expiry against Compose simulators | No Docker |
+| EventBridge → Lambda invoke in AWS | Stub only until Phase 12 |
+
+### Explicitly out of scope (Phase 9)
+
+- React UI (Phase 10)
+- Observability dashboards / perf (Phase 11)
+- Terraform Lambda packaging + IAM (Phase 12)
+
+---
+
 ## Remaining (roadmap only — not started)
 
-9. Lambdas · 10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.
+10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.

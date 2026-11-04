@@ -123,6 +123,12 @@ public sealed class DecideApprovalCommandHandlerTests
 
         public Task<ApprovalCase?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult<ApprovalCase?>(approval.Id == id ? approval : null);
+
+        public Task<IReadOnlyList<ApprovalCase>> ListPendingAsync(
+            int take,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ApprovalCase>>(
+                approval.Status == ApprovalCaseStatus.Pending ? [approval] : []);
     }
 
     private sealed class FakeUnitOfWork : IUnitOfWork
@@ -158,6 +164,18 @@ public sealed class DecideApprovalCommandHandlerTests
             LicenseExtensionRequest request,
             ApprovalCase approvalCase,
             ApprovalDecision decision,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task NotifyApprovalReminderAsync(
+            LicenseExtensionRequest request,
+            ApprovalCase approvalCase,
+            ApprovalStage stage,
+            TimeSpan pendingFor,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task NotifyExpirationWarningAsync(
+            EntitleX.Application.EntitlementAggregation.Models.NormalizedEntitlementDto entitlement,
+            string portalLink,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 

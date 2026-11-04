@@ -32,4 +32,18 @@ public sealed class ApprovalCaseRepository : IApprovalCaseRepository
             .Include(x => x.Stages)
             .Include(x => x.Decisions)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<ApprovalCase>> ListPendingAsync(
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var limit = Math.Clamp(take, 1, 500);
+        return await _dbContext.ApprovalCases
+            .Include(x => x.Stages)
+            .Include(x => x.Decisions)
+            .Where(x => x.Status == ApprovalCaseStatus.Pending)
+            .OrderBy(x => x.CreatedAtUtc)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
 }
