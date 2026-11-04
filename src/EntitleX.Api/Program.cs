@@ -45,7 +45,7 @@ try
         {
             Title = "EntitleX API",
             Version = "v1",
-            Description = "Enterprise license-extension control plane (Phase 8 — reconciliation / failure repair)."
+            Description = "Enterprise license-extension control plane (Phase 10 — React BFF + ops/audit reads)."
         });
 
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -76,12 +76,23 @@ try
 
     builder.Services.AddProblemDetails();
 
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("FrontendDev", policy =>
+            policy.WithOrigins(
+                    "http://localhost:5173",
+                    "http://127.0.0.1:5173")
+                .AllowAnyHeader()
+                .AllowAnyMethod());
+    });
+
     var app = builder.Build();
 
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseSerilogRequestLogging();
     app.UseEntitleXExceptionHandler();
 
+    app.UseCors("FrontendDev");
     app.UseAuthentication();
     app.UseAuthorization();
 
@@ -109,8 +120,11 @@ try
     app.MapLicenseExtensionRetryEndpoints();
     app.MapEntitlementAggregationEndpoints();
     app.MapApprovalEndpoints();
+    app.MapPendingApprovalEndpoints();
     app.MapSagaEndpoints();
     app.MapReconciliationEndpoints();
+    app.MapAuditEndpoints();
+    app.MapOpsEndpoints();
 
     var jwtOptions = app.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
     if (app.Environment.IsDevelopment() && jwtOptions.EnableDevTokenEndpoint)

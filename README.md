@@ -2,7 +2,7 @@
 
 Enterprise license-extension platform (portfolio). Orchestrates extension requests across fictional vendor systems **CloudShield** and **NetworkGuard**. No proprietary IP.
 
-Phase 6 adds the durable centralized saga (forward recovery). See [docs/implementation-progress.md](docs/implementation-progress.md), [docs/saga-workflow.md](docs/saga-workflow.md), and [docs/event-contracts.md](docs/event-contracts.md).
+Phase 10 adds the React control-plane UI (Vite + TanStack Query + MUI). See [docs/implementation-progress.md](docs/implementation-progress.md), [frontend/README.md](frontend/README.md), [docs/saga-workflow.md](docs/saga-workflow.md), and [docs/event-contracts.md](docs/event-contracts.md).
 
 ## Architecture
 
@@ -66,8 +66,9 @@ dotnet test tests/CloudShield.Domain.UnitTests
 dotnet test tests/EntitleX.Infrastructure.IntegrationTests        # Docker for Testcontainers
 dotnet test tests/CloudShield.Infrastructure.IntegrationTests     # Docker for Testcontainers
 
-# Frontend scaffold
-cd frontend && npm install && npm run dev
+# Frontend (Phase 10) — proxies /api and /health to :5080
+cd frontend && npm install && npm run dev     # http://localhost:5173
+cd frontend && npm run build
 ```
 
 ### Auth (Development)
@@ -111,6 +112,9 @@ Use the returned `accessToken` as `Authorization: Bearer <token>`.
 | `GET` | `/api/v1/license-extension-requests/{id}/approval` | Authenticated | Case, stages, decisions |
 | `POST` | `/api/v1/license-extension-requests/{id}/approval/decisions` | RM / DealDesk / Admin | `{ "outcome":"Approved\|Rejected", "comment":"..." }` |
 | `GET` | `/api/v1/entitlements/search?customerId=` | Authenticated | Aggregate entitlements |
+| `GET` | `/api/v1/approvals/pending` | RM / DealDesk / Admin | Pending approval queue (`role`, `take`, `skip`) |
+| `GET` | `/api/v1/audit/requests/{requestId}` | Authenticated | Audit events for a request |
+| `GET` | `/api/v1/admin/ops/summary` | PlatformAdmin | Ops monitoring summary |
 | `GET` | `/health` | Anonymous | Liveness |
 | `GET` | `/swagger` | Anonymous (Dev) | OpenAPI UI |
 
