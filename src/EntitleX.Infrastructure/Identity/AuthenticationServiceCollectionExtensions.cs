@@ -77,6 +77,11 @@ public static class AuthenticationServiceCollectionExtensions
             options.AddPolicy(
                 AuthorizationPolicies.CanReadApprovals,
                 policy => policy.RequireAuthenticatedUser());
+
+            options.AddPolicy(
+                AuthorizationPolicies.CanManageReconciliation,
+                policy => policy.RequireRole(
+                    Domain.Identity.EntitleXRoles.PlatformAdmin));
         });
 
         return services;
@@ -88,4 +93,5 @@ public static class AuthorizationPolicies
     public const string CanCreateRequests = "CanCreateRequests";
     public const string CanDecideApprovals = "CanDecideApprovals";
     public const string CanReadApprovals = "CanReadApprovals";
+    public const string CanManageReconciliation = "CanManageReconciliation";
 }

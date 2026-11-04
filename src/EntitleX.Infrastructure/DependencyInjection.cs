@@ -1,6 +1,7 @@
 using EntitleX.Application;
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
+using EntitleX.Infrastructure.Audit;
 using EntitleX.Infrastructure.Identity;
 using EntitleX.Infrastructure.Notifications;
 using EntitleX.Infrastructure.Outbox;
@@ -45,6 +46,8 @@ public static class DependencyInjection
         services.AddScoped<OutboxPublisherService>();
         services.AddScoped<IConsumerIdempotencyStore, EfConsumerIdempotencyStore>();
         services.AddScoped<IRetryClaimStore, EfRetryClaimStore>();
+        services.AddScoped<IAuditEventStore, EfAuditEventStore>();
+        services.AddScoped<ILocalFulfillmentOutcomeStore, EfLocalFulfillmentOutcomeStore>();
         services.AddScoped<ProviderResultProcessor>();
 
         services.AddEntitleXMessaging(configuration);
@@ -53,6 +56,8 @@ public static class DependencyInjection
 
         services.AddTransient<IProviderEntitlementClient, CloudShieldEntitlementClient>();
         services.AddTransient<IProviderEntitlementClient, NetworkGuardEntitlementClient>();
+        services.AddTransient<IProviderOperationStatusClient, CloudShieldOperationStatusClient>();
+        services.AddTransient<IProviderOperationStatusClient, NetworkGuardOperationStatusClient>();
 
         services.AddEntitleXAuthentication(configuration);
         services.AddEntitleXEmail(configuration);
@@ -91,7 +96,12 @@ public static class DependencyInjection
         services.AddScoped<OutboxClaimer>();
         services.AddScoped<OutboxPublisherService>();
         services.AddScoped<IConsumerIdempotencyStore, EfConsumerIdempotencyStore>();
+        services.AddScoped<IAuditEventStore, EfAuditEventStore>();
+        services.AddScoped<ILocalFulfillmentOutcomeStore, EfLocalFulfillmentOutcomeStore>();
         services.AddScoped<ProviderResultProcessor>();
+        services.AddProviderHttpClients(configuration);
+        services.AddTransient<IProviderOperationStatusClient, CloudShieldOperationStatusClient>();
+        services.AddTransient<IProviderOperationStatusClient, NetworkGuardOperationStatusClient>();
         services.AddSagaOrchestration();
         services.AddEntitleXMessaging(configuration);
         return services;

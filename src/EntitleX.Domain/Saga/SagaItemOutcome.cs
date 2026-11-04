@@ -111,4 +111,45 @@ public sealed class SagaItemOutcome
         ErrorMessage = reason;
         UpdatedAtUtc = atUtc;
     }
+
+    /// <summary>
+    /// Reconciliation corrective repair: provider confirmed Applied. Allows
+    /// Failed → Succeeded when local state lagged the provider (never the reverse).
+    /// </summary>
+    internal void CorrectToSucceeded(DateTimeOffset atUtc)
+    {
+        if (Status == SagaItemOutcomeStatus.Succeeded)
+        {
+            return;
+        }
+
+        Status = SagaItemOutcomeStatus.Succeeded;
+        ErrorCode = null;
+        ErrorMessage = null;
+        UpdatedAtUtc = atUtc;
+    }
+
+    /// <summary>
+    /// Keeps or re-marks Uncertain after an inconclusive provider probe.
+    /// Succeeded items are never demoted (forward recovery).
+    /// </summary>
+    internal void KeepUncertain(string? reason, DateTimeOffset atUtc)
+    {
+        if (Status == SagaItemOutcomeStatus.Succeeded)
+        {
+            return;
+        }
+
+        if (Status == SagaItemOutcomeStatus.Failed)
+        {
+            // Definitive local failure stays failed unless provider proves Applied
+            // (handled by CorrectToSucceeded). Unknown probes do not clear Failed.
+            return;
+        }
+
+        Status = SagaItemOutcomeStatus.Uncertain;
+        ErrorCode = "UNCERTAIN";
+        ErrorMessage = reason;
+        UpdatedAtUtc = atUtc;
+    }
 }

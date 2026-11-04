@@ -45,7 +45,7 @@ try
         {
             Title = "EntitleX API",
             Version = "v1",
-            Description = "Enterprise license-extension control plane (Phase 7 — selective retry / idempotency)."
+            Description = "Enterprise license-extension control plane (Phase 8 — reconciliation / failure repair)."
         });
 
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -110,6 +110,7 @@ try
     app.MapEntitlementAggregationEndpoints();
     app.MapApprovalEndpoints();
     app.MapSagaEndpoints();
+    app.MapReconciliationEndpoints();
 
     var jwtOptions = app.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
     if (app.Environment.IsDevelopment() && jwtOptions.EnableDevTokenEndpoint)

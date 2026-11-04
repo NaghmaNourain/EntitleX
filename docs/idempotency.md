@@ -38,14 +38,16 @@ the **prior** retry request (same id). No second claim, no second outbox write.
 
 Succeeded siblings are **never** copied (forward recovery).
 
-## Reconcile-uncertain gate (Phase 7 stub / Phase 8 port)
+## Reconcile-uncertain gate (Phase 8)
 
-Before claiming, `IReconciliationGate` (`StubReconciliationGate`) blocks retry when:
+Before claiming, `IReconciliationGate` (`ReconciliationGate`) blocks retry when:
 
 - Saga state is `ReconciliationRequired`, or
-- Any item outcome is `Uncertain`
+- Any item outcome is `Uncertain`, or
+- Local `fulfillment_item_results` shows Success while the saga still has
+  `Failed` / `Pending` for the same `LogicalOperationId`
 
-Full reconciliation repair is Phase 8.
+Repair those cases via reconciliation (`docs/reconciliation.md`) before retry.
 
 ## DB-backed claims (short Postgres transaction)
 

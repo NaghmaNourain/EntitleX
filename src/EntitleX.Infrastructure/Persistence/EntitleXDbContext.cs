@@ -2,6 +2,7 @@ using EntitleX.Application.Abstractions;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;
+using EntitleX.Infrastructure.Audit;
 using EntitleX.Infrastructure.Outbox;
 using EntitleX.Infrastructure.Retry;
 using Microsoft.EntityFrameworkCore;
@@ -40,6 +41,8 @@ public sealed class EntitleXDbContext : DbContext, IUnitOfWork
     public DbSet<ApiIdempotencyRecord> ApiIdempotencyRecords => Set<ApiIdempotencyRecord>();
 
     public DbSet<RetryItemClaim> RetryItemClaims => Set<RetryItemClaim>();
+
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

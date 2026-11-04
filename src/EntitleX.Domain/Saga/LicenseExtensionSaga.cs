@@ -381,6 +381,64 @@ public sealed class LicenseExtensionSaga : AggregateRoot
     }
 
     /// <summary>
+    /// Phase 8 corrective repair when the provider confirms Applied for a
+    /// LogicalOperationId (including when local previously recorded Failed).
+    /// Idempotent when the item is already Succeeded (including terminal sagas).
+    /// </summary>
+    public void CorrectItemSucceededFromReconciliation(
+        LogicalOperationId logicalOperationId,
+        string? correlationId = null,
+        DateTimeOffset? atUtc = null)
+    {
+        var now = atUtc ?? DateTimeOffset.UtcNow;
+        var item = FindItem(logicalOperationId);
+        if (item.Status == SagaItemOutcomeStatus.Succeeded)
+        {
+            return;
+        }
+
+        EnsureNotTerminal();
+        item.CorrectToSucceeded(now);
+        UpdatedAtUtc = now;
+        TryAggregateAfterItemUpdate(correlationId, now);
+    }
+
+    /// <summary>
+    /// Leaves an item Uncertain after an inconclusive provider probe.
+    /// Ensures saga remains <see cref="SagaState.ReconciliationRequired"/>.
+    /// </summary>
+    public void KeepItemUncertainFromReconciliation(
+        LogicalOperationId logicalOperationId,
+        string reason,
+        string? correlationId = null,
+        DateTimeOffset? atUtc = null)
+    {
+        if (State is SagaState.Completed or SagaState.Failed or SagaState.Rejected)
+        {
+            return;
+        }
+
+        var now = atUtc ?? DateTimeOffset.UtcNow;
+        var item = FindItem(logicalOperationId);
+        item.KeepUncertain(reason, now);
+        UpdatedAtUtc = now;
+
+        if (State != SagaState.ReconciliationRequired)
+        {
+            if (State is SagaState.QueuedForFulfillment or SagaState.Processing
+                or SagaState.PartiallyCompleted or SagaState.Escalated)
+            {
+                TransitionTo(
+                    SagaState.ReconciliationRequired,
+                    reason,
+                    actor: "reconciliation",
+                    correlationId,
+                    now);
+            }
+        }
+    }
+
+    /// <summary>
     /// Aggregates item outcomes into a terminal or partial saga state.
     /// Mixed success/failure → <see cref="SagaState.PartiallyCompleted"/>;
     /// successful siblings are never rolled back.

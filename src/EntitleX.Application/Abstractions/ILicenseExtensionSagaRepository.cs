@@ -22,4 +22,11 @@ public interface ILicenseExtensionSagaRepository
         DateTimeOffset nowUtc,
         int take,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sagas needing reconciliation repair (ReconciliationRequired and/or Uncertain items).
+    /// </summary>
+    Task<IReadOnlyList<LicenseExtensionSaga>> ListRequiringReconciliationAsync(
+        int take,
+        CancellationToken cancellationToken = default);
 }
