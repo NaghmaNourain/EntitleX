@@ -2,14 +2,17 @@
 
 Enterprise license-extension platform (portfolio). Orchestrates extension requests across fictional vendor systems **CloudShield** and **NetworkGuard**. No proprietary IP.
 
-Phase 3 adds provider simulator APIs (own DBs + seed data), `AppliedLicenseOperation` idempotency, and control-plane entitlement aggregation with Polly resilience. See [docs/implementation-progress.md](docs/implementation-progress.md).
+Phase 4 adds JWT/RBAC, day-band approval workflows, decision audit metadata, and notification emails with in-app links (Mailpit SMTP / LocalStack SES). See [docs/implementation-progress.md](docs/implementation-progress.md).
 
 ## Architecture
 
 - **Modular control-plane API** (`EntitleX.Api`) with Clean Architecture layers
 - **DDD request aggregate** (`LicenseExtensionRequest` + items) with invariant-enforcing methods
+- **Approval case aggregate** with sequential, role-gated stages and `ApprovalVersion` / `ApprovedScopeHash`
+- **JWT Bearer + RBAC** (`RenewalRepresentative`, `RenewalManager`, `DealDeskManager`, `PlatformAdmin`)
 - **Entitlement aggregation** across CloudShield + NetworkGuard (partial results, correlation IDs)
 - **Vendor simulators** with own PostgreSQL databases and `AppliedLicenseOperation` claim semantics
+- **Notification emails** via Mailpit (SMTP) or LocalStack SES — app links only, no email approve buttons
 - **Separate workers** for async work (fulfillment, outbox, reconciliation, notifications)
 - **Lambda stubs** for scheduled approval reminders and expiration notifications
 - Decision record: [docs/adr/0001-modular-api-vs-microservices.md](docs/adr/0001-modular-api-vs-microservices.md)
@@ -27,15 +30,18 @@ Phase 3 adds provider simulator APIs (own DBs + seed data), `AppliedLicenseOpera
 dotnet restore EntitleX.sln
 dotnet build EntitleX.sln
 
-# Start local infrastructure (Postgres with entitlex_platform / cloudshield / networkguard)
+# Start local infrastructure (Postgres, Mailpit, LocalStack w/ SES, …)
 docker compose up -d
 
 # Vendor simulators (Development migrates + seeds demo data)
 dotnet run --project src/simulators/CloudShield/CloudShield.Api    # :5081
 dotnet run --project src/simulators/NetworkGuard/NetworkGuard.Api  # :5082
 
-# Platform API (aggregates from Providers:* BaseUrls)
+# Platform API (Development: JWT + MigrateOnStartup + Mailpit SMTP)
 dotnet run --project src/EntitleX.Api                             # :5080
+
+# Optional: notification probe worker (same Email:* config)
+dotnet run --project src/workers/EntitleX.NotificationService
 
 # Tests
 dotnet test tests/EntitleX.Domain.UnitTests
@@ -49,15 +55,55 @@ dotnet test tests/CloudShield.Infrastructure.IntegrationTests     # Docker for T
 cd frontend && npm install && npm run dev
 ```
 
+### Auth (Development)
+
+Secure defaults: APIs require a Bearer JWT except health/Swagger/dev-token. Production must set a strong `Jwt__SigningKey` (≥32 chars); the Development key below is **dev-only**.
+
+Mint a seed token (Development + `Jwt:EnableDevTokenEndpoint=true`):
+
+```bash
+curl -s -X POST http://localhost:5080/api/v1/dev/tokens \
+  -H 'Content-Type: application/json' \
+  -d '{"role":"RenewalRepresentative"}'
+```
+
+| Role | Seed user id | Seed email |
+|------|--------------|------------|
+| `RenewalRepresentative` | `user-rep-001` | `renewal.rep@entitlex.local` |
+| `RenewalManager` | `user-rm-001` | `renewal.manager@entitlex.local` |
+| `DealDeskManager` | `user-dd-001` | `dealdesk.manager@entitlex.local` |
+| `PlatformAdmin` | `user-admin-001` | `platform.admin@entitlex.local` |
+
+Use the returned `accessToken` as `Authorization: Bearer <token>`.
+
+### Approval rules
+
+| Max extension days (across items) | Path |
+|-----------------------------------|------|
+| 1–30 | Auto-approved |
+| 31–90 | Renewal Manager |
+| 91–365 | Renewal Manager, then Deal Desk |
+| >365 | Rejected (unsupported) |
+
 ### Control-plane APIs
 
-| Method | Path | Notes |
-|--------|------|-------|
-| `POST` | `/api/v1/license-extension-requests` | Create + submit; max 1000 items |
-| `GET` | `/api/v1/license-extension-requests/{id}` | Load request with items |
-| `GET` | `/api/v1/entitlements/search?customerId=` | Aggregate entitlements (partial OK) |
-| `GET` | `/health/providers` | Per-provider readiness |
-| `GET` | `/swagger` | OpenAPI UI (Development) |
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| `POST` | `/api/v1/dev/tokens` | Anonymous (Dev only) | Mint seed JWT by role |
+| `POST` | `/api/v1/license-extension-requests` | Rep / Admin | Create + submit + open approval |
+| `GET` | `/api/v1/license-extension-requests/{id}` | Authenticated | Load request with items |
+| `POST` | `/api/v1/license-extension-requests/{id}/approval/start` | Rep / Admin | Start approval if missing |
+| `GET` | `/api/v1/license-extension-requests/{id}/approval` | Authenticated | Case, stages, decisions |
+| `POST` | `/api/v1/license-extension-requests/{id}/approval/decisions` | RM / DealDesk / Admin | `{ "outcome":"Approved\|Rejected", "comment":"..." }` |
+| `GET` | `/api/v1/entitlements/search?customerId=` | Authenticated | Aggregate entitlements |
+| `GET` | `/health` | Anonymous | Liveness |
+| `GET` | `/swagger` | Anonymous (Dev) | OpenAPI UI |
+
+### Email notifications
+
+- Config: `Email:Provider` = `Smtp` (default → Mailpit `:1025`) or `Ses` (LocalStack `:4566`)
+- Bodies include `Email:AppBaseUrl/requests/{id}` deep links — **no approve/reject email actions**
+- Inspect Mailpit UI at `http://localhost:8025`
 
 ### Simulator APIs (demo customer `CUST-1001`)
 
@@ -66,7 +112,7 @@ cd frontend && npm install && npm run dev
 | CloudShield | `GET /api/v1/accounts/{accountId}/entitlements` | `GET /api/v1/entitlements/{key}` | `POST .../license-extensions` | `GET /api/v1/license-operations/{logicalOperationId}` |
 | NetworkGuard | `GET /api/v1/tenants/{tenantId}/licenses` | `GET /api/v1/licenses/{id}` | `POST .../extensions` | `GET /api/v1/operations/{logicalOperationId}` |
 
-Workers (optional heartbeat stubs):
+Workers (optional):
 
 ```bash
 dotnet run --project src/workers/EntitleX.FulfillmentWorker
@@ -81,7 +127,7 @@ dotnet run --project src/workers/EntitleX.NotificationService
 |-------------|-------------------------------|--------------------------------------------|
 | Postgres    | `5432`                        | User/pass `entitlex` / `entitlex`          |
 | Kafka       | `9092`                        | KRaft single-node                          |
-| LocalStack  | `4566`                        | AWS emulator                               |
+| LocalStack  | `4566`                        | AWS emulator (includes **SES**)            |
 | Mailpit     | `1025` (SMTP), `8025` (UI)    | Dev email                                  |
 | Jaeger      | `16686` (UI), `4317`/`4318`   | OTLP collectors                            |
 | Prometheus  | `9090`                        | Metrics                                    |
@@ -102,7 +148,7 @@ Postgres init creates databases: `entitlex_platform`, `cloudshield`, `networkgua
 ```
 src/
   EntitleX.{BuildingBlocks,Messaging,Domain,Application,Infrastructure,Api}/
-  workers/          # BackgroundService heartbeat stubs
+  workers/          # BackgroundService workers (notifications use Email:*)
   simulators/       # CloudShield + NetworkGuard (own EF schemas)
   lambdas/          # Approval reminder + expiration notification stubs
 frontend/           # Vite React + TypeScript (no feature pages yet)
