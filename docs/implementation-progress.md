@@ -1,65 +1,107 @@
 # EntitleX implementation progress
 
-## Phase 1 — Foundations (current)
+## Phase 1 — Foundations
 
-**Status:** Complete (skeletons + local infra + docs + CI)
+**Status:** Complete (see PR branch `cursor/phase-1-foundations-bc4f`)
 
 ### Verified
 
 | Item | Result |
 |------|--------|
-| `dotnet build EntitleX.sln` | Succeeds on .NET SDK 8.x (0 warnings, 0 errors) |
+| `dotnet build EntitleX.sln` | Succeeds on .NET SDK 8.x |
 | Solution projects compile | Platform, workers, simulators, lambda stubs |
 | Frontend `npm run build` | Succeeds (Vite React + TypeScript scaffold) |
 | `docker compose config` | Validated successfully (Compose v2) |
-| Live `GET /health` | EntitleX.Api `:5080`, CloudShield `:5081`, NetworkGuard `:5082` return Healthy JSON |
-| ADR 0001 | Documented modular API decision |
-| CI workflow | `.github/workflows/ci.yml` restores + builds on PR/push |
+| Live `GET /health` | EntitleX.Api `:5080`, CloudShield `:5081`, NetworkGuard `:5082` |
+| ADR 0001 | Modular API decision documented |
+| CI workflow | Restore + build on PR/push |
+
+---
+
+## Phase 2 — Domain model and request APIs
+
+**Status:** Complete on branch `cursor/phase-2-domain-apis-bc4f` (based on Phase 1)
+
+### Verified
+
+| Item | Result |
+|------|--------|
+| `dotnet build EntitleX.sln` | Succeeds (0 warnings, 0 errors) |
+| Domain unit tests | **11 passed** (`EntitleX.Domain.UnitTests`) |
+| Integration tests (Testcontainers) | **2 skipped** without Docker (`DockerFact`) |
+| EF migration `InitialLicenseExtension` | Generated for `entitlex_platform` |
+| MediatR create/get + FluentValidation | Wired; max 1000 items |
+| API endpoints | `POST/GET /api/v1/license-extension-requests` |
+
+---
+
+## Phase 3 — Providers + entitlement aggregation (current)
+
+**Status:** Complete on branch `cursor/phase-3-providers-bc4f` (based on Phase 2)
+
+### Verified
+
+| Item | Result |
+|------|--------|
+| `dotnet build EntitleX.sln` | Succeeds (0 warnings, 0 errors) |
+| CloudShield / NetworkGuard domain unit tests | Passed |
+| Aggregation + adapter unit tests | Passed |
+| Provider integration (Testcontainers) | Skipped without Docker (`DockerFact`) |
+| EF migrations | `InitialCloudShield`, `InitialNetworkGuard` |
+
+### Delivered in Phase 3
+
+**Simulator APIs (own DBs + deterministic seed)**
+
+- CloudShield (`cloudshield` DB): account entitlement discovery, details (product/group/expiry), license-extension submit, operation status lookup
+- NetworkGuard (`networkguard` DB): tenant license discovery, details (SKU/group/validity), extension submit, operation status lookup
+- Demo seeds: `CUST-1001` appears in both providers; additional exclusive customers for partial-coverage demos
+- Development: `Database:MigrateOnStartup` + `Database:SeedDemoData`
+
+**AppliedLicenseOperation**
+
+- Unique `LogicalOperationId` (DB unique index)
+- Atomic claim + expiry update inside a single provider DB transaction
+- Idempotent replay returns `AlreadyApplied` without double-extending
+- No remote HTTP is performed while a DB transaction is open
+
+**Control-plane aggregation**
+
+- `IProviderEntitlementClient` adapters via `IHttpClientFactory`
+- Polly v8 (`Microsoft.Extensions.Http.Resilience`): timeout, retry+jitter for idempotent GET clients only, circuit breaker, concurrency limiter (bulkhead)
+- Separate command HttpClients **without** retry (non-idempotent POSTs must not be blindly retried)
+- Normalized `NormalizedEntitlementDto`; partial aggregation when a provider fails
+- Correlation IDs (`X-Correlation-ID`) + structured Serilog
+- Health checks: `/health/ready`, `/health/providers` (per-provider tags)
+
+**API**
+
+- `GET /api/v1/entitlements/search?customerId={id}` — fan-out aggregation
+
+**Tests**
+
+- `EntitleX.Application.UnitTests` — partial aggregation
+- `EntitleX.Infrastructure.UnitTests` — adapter normalization (CloudShield + NetworkGuard)
+- `CloudShield.Domain.UnitTests` — expiry / AppliedLicenseOperation invariants
+- `CloudShield.Infrastructure.IntegrationTests` — atomic claim idempotency (Testcontainers; skips without Docker)
 
 ### Unverified in this environment
 
 | Item | Reason |
 |------|--------|
-| `docker compose up` / container health | Docker engine/daemon not running in the agent environment (CLI present; config OK) |
-| End-to-end Postgres init script against a live cluster | Init shell script present; not executed against a running Postgres |
-| Kafka / LocalStack / Mailpit / Jaeger / Prometheus / Grafana smoke | Images declared; not started |
+| Live simulator ↔ API aggregation against Compose | Docker engine/CLI not available |
+| Testcontainers PostgreSQL for claim/idempotency | Docker not available; tests auto-skip |
+| Circuit-breaker trip under sustained provider failure | Unit coverage of adapters/aggregation only |
 
-### Delivered in Phase 1
+### Explicitly out of scope (Phase 3)
 
-- Repo bootstrap: `.gitignore`, MIT `LICENSE`, `README.md`, `global.json` (SDK 8.x), `Directory.Build.props`
-- Clean Architecture solution: `EntitleX.sln` with BuildingBlocks, Messaging, Domain, Application, Infrastructure, Api
-- Workers (heartbeat stubs): FulfillmentWorker, OutboxPublisher, ReconciliationWorker, NotificationService
-- Simulators: CloudShield + NetworkGuard (Domain/Application/Infrastructure/Api) with `GET /health`
-- Lambda stubs: ApprovalReminder, ExpirationNotification
-- Platform Api `GET /health`
-- `frontend/` Vite React + TypeScript scaffold (no feature pages)
-- `docker-compose.yml` with Postgres (multi-DB init), Kafka KRaft, LocalStack, Mailpit, Jaeger, Prometheus, Grafana + named volumes
-- ADR: `docs/adr/0001-modular-api-vs-microservices.md`
-- CI: restore + `dotnet build` on PR/push
-
-### Explicitly out of scope (Phase 1)
-
-- EF Core migrations / persistence
-- Domain aggregates and real use-cases
-- JWT / auth
-- Kafka producers/consumers
-- React feature pages
-- Terraform
-- Polly resilience pipelines
-- Integration tests
+- Approvals / JWT (Phase 4)
+- Outbox / SQS / Kafka (Phase 5+)
+- Saga / selective retry factories (Phase 6–7)
+- React entitlement search UI (Phase 10)
 
 ---
 
-## Phase 2 — Remaining (not started)
+## Remaining (roadmap only — not started)
 
-Expected next work (indicative; not implemented here):
-
-- Domain model for license-extension requests / approvals / entitlements (selective DDD)
-- EF Core DbContexts + migrations for `entitlex_platform`, `cloudshield`, `networkguard`
-- Application use-cases and API endpoints beyond health
-- Outbox pattern + Kafka messaging wiring
-- AuthN/AuthZ (JWT) for the control plane
-- Simulator vendor APIs with realistic license operations
-- Frontend feature pages against the control plane
-- Integration test harness against docker-compose dependencies
-- Observability instrumentation (OTLP → Jaeger, metrics → Prometheus)
+4. Approvals + auth · 5. Outbox/SQS/Kafka · 6. Saga · 7. Selective retry · 8. Reconciliation · 9. Lambdas · 10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.

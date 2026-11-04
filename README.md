@@ -2,13 +2,15 @@
 
 Enterprise license-extension platform (portfolio). Orchestrates extension requests across fictional vendor systems **CloudShield** and **NetworkGuard**. No proprietary IP.
 
-Phase 1 delivers solution skeletons, local infrastructure, ADR, and CI. See [docs/implementation-progress.md](docs/implementation-progress.md).
+Phase 3 adds provider simulator APIs (own DBs + seed data), `AppliedLicenseOperation` idempotency, and control-plane entitlement aggregation with Polly resilience. See [docs/implementation-progress.md](docs/implementation-progress.md).
 
-## Architecture (Phase 1)
+## Architecture
 
 - **Modular control-plane API** (`EntitleX.Api`) with Clean Architecture layers
+- **DDD request aggregate** (`LicenseExtensionRequest` + items) with invariant-enforcing methods
+- **Entitlement aggregation** across CloudShield + NetworkGuard (partial results, correlation IDs)
+- **Vendor simulators** with own PostgreSQL databases and `AppliedLicenseOperation` claim semantics
 - **Separate workers** for async work (fulfillment, outbox, reconciliation, notifications)
-- **Vendor simulators** (CloudShield / NetworkGuard), each with Domain → Application → Infrastructure → Api
 - **Lambda stubs** for scheduled approval reminders and expiration notifications
 - Decision record: [docs/adr/0001-modular-api-vs-microservices.md](docs/adr/0001-modular-api-vs-microservices.md)
 
@@ -25,19 +27,44 @@ Phase 1 delivers solution skeletons, local infrastructure, ADR, and CI. See [doc
 dotnet restore EntitleX.sln
 dotnet build EntitleX.sln
 
-# Start local infrastructure
+# Start local infrastructure (Postgres with entitlex_platform / cloudshield / networkguard)
 docker compose up -d
 
-# Platform API (http://localhost:5080/health)
-dotnet run --project src/EntitleX.Api
+# Vendor simulators (Development migrates + seeds demo data)
+dotnet run --project src/simulators/CloudShield/CloudShield.Api    # :5081
+dotnet run --project src/simulators/NetworkGuard/NetworkGuard.Api  # :5082
 
-# Vendor simulators
-dotnet run --project src/simulators/CloudShield/CloudShield.Api    # :5081/health
-dotnet run --project src/simulators/NetworkGuard/NetworkGuard.Api  # :5082/health
+# Platform API (aggregates from Providers:* BaseUrls)
+dotnet run --project src/EntitleX.Api                             # :5080
+
+# Tests
+dotnet test tests/EntitleX.Domain.UnitTests
+dotnet test tests/EntitleX.Application.UnitTests
+dotnet test tests/EntitleX.Infrastructure.UnitTests
+dotnet test tests/CloudShield.Domain.UnitTests
+dotnet test tests/EntitleX.Infrastructure.IntegrationTests        # Docker for Testcontainers
+dotnet test tests/CloudShield.Infrastructure.IntegrationTests     # Docker for Testcontainers
 
 # Frontend scaffold
 cd frontend && npm install && npm run dev
 ```
+
+### Control-plane APIs
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `POST` | `/api/v1/license-extension-requests` | Create + submit; max 1000 items |
+| `GET` | `/api/v1/license-extension-requests/{id}` | Load request with items |
+| `GET` | `/api/v1/entitlements/search?customerId=` | Aggregate entitlements (partial OK) |
+| `GET` | `/health/providers` | Per-provider readiness |
+| `GET` | `/swagger` | OpenAPI UI (Development) |
+
+### Simulator APIs (demo customer `CUST-1001`)
+
+| Provider | Discovery | Details | Extension | Operation status |
+|----------|-----------|---------|-----------|------------------|
+| CloudShield | `GET /api/v1/accounts/{accountId}/entitlements` | `GET /api/v1/entitlements/{key}` | `POST .../license-extensions` | `GET /api/v1/license-operations/{logicalOperationId}` |
+| NetworkGuard | `GET /api/v1/tenants/{tenantId}/licenses` | `GET /api/v1/licenses/{id}` | `POST .../extensions` | `GET /api/v1/operations/{logicalOperationId}` |
 
 Workers (optional heartbeat stubs):
 
@@ -76,7 +103,7 @@ Postgres init creates databases: `entitlex_platform`, `cloudshield`, `networkgua
 src/
   EntitleX.{BuildingBlocks,Messaging,Domain,Application,Infrastructure,Api}/
   workers/          # BackgroundService heartbeat stubs
-  simulators/       # CloudShield + NetworkGuard
+  simulators/       # CloudShield + NetworkGuard (own EF schemas)
   lambdas/          # Approval reminder + expiration notification stubs
 frontend/           # Vite React + TypeScript (no feature pages yet)
 infra/docker/       # Postgres init, Prometheus config
