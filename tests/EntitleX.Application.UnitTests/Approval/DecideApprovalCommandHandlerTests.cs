@@ -16,6 +16,7 @@ public sealed class DecideApprovalCommandHandlerTests
     public async Task Handle_WhenActorLacksStageRole_ThrowsForbidden()
     {
         var (request, approval) = CreatePendingRmCase(days: 60);
+        var outbox = new FakeFulfillmentOutbox();
         var handler = new DecideApprovalCommandHandler(
             new FakeRequestRepository(request),
             new FakeApprovalRepository(approval),
@@ -24,7 +25,8 @@ public sealed class DecideApprovalCommandHandlerTests
                 "user-dd-001",
                 "Dana",
                 [EntitleXRoles.DealDeskManager]),
-            new NoopNotifications());
+            new NoopNotifications(),
+            outbox);
 
         var ex = await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(
@@ -34,12 +36,14 @@ public sealed class DecideApprovalCommandHandlerTests
         Assert.Contains("RenewalManager", ex.Message, StringComparison.Ordinal);
         Assert.Equal(LicenseExtensionRequestStatus.PendingApproval, request.Status);
         Assert.Equal(ApprovalCaseStatus.Pending, approval.Status);
+        Assert.Equal(0, outbox.EnqueueCount);
     }
 
     [Fact]
-    public async Task Handle_WhenRenewalManagerApproves_UpdatesRequestScope()
+    public async Task Handle_WhenRenewalManagerApproves_EnqueuesFulfillmentOutbox()
     {
         var (request, approval) = CreatePendingRmCase(days: 60);
+        var outbox = new FakeFulfillmentOutbox();
         var handler = new DecideApprovalCommandHandler(
             new FakeRequestRepository(request),
             new FakeApprovalRepository(approval),
@@ -48,16 +52,18 @@ public sealed class DecideApprovalCommandHandlerTests
                 "user-rm-001",
                 "Morgan",
                 [EntitleXRoles.RenewalManager]),
-            new NoopNotifications());
+            new NoopNotifications(),
+            outbox);
 
         var dto = await handler.Handle(
             new DecideApprovalCommand(request.Id.Value, "Approved", "lgtm", "corr-9"),
             CancellationToken.None);
 
         Assert.Equal(nameof(ApprovalCaseStatus.Approved), dto.Status);
-        Assert.Equal(LicenseExtensionRequestStatus.Approved, request.Status);
+        Assert.Equal(LicenseExtensionRequestStatus.InFulfillment, request.Status);
         Assert.Equal(1, request.ApprovalVersion);
         Assert.False(string.IsNullOrWhiteSpace(request.ApprovedScopeHash));
+        Assert.Equal(1, outbox.EnqueueCount);
     }
 
     private static (LicenseExtensionRequest Request, ApprovalCase Approval) CreatePendingRmCase(int days)
@@ -149,5 +155,21 @@ public sealed class DecideApprovalCommandHandlerTests
             ApprovalCase approvalCase,
             ApprovalDecision decision,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class FakeFulfillmentOutbox : IFulfillmentOutboxService
+    {
+        public int EnqueueCount { get; private set; }
+
+        public Task EnqueueAfterFinalApprovalAsync(
+            LicenseExtensionRequest request,
+            Guid? correlationId = null,
+            Guid? causationId = null,
+            CancellationToken cancellationToken = default)
+        {
+            request.BeginFulfillment();
+            EnqueueCount++;
+            return Task.CompletedTask;
+        }
     }
 }

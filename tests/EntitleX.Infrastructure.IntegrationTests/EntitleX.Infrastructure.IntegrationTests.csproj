@@ -19,9 +19,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\EntitleX.Application\EntitleX.Application.csproj" />
     <ProjectReference Include="..\..\src\EntitleX.Domain\EntitleX.Domain.csproj" />
     <ProjectReference Include="..\..\src\EntitleX.Infrastructure\EntitleX.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\EntitleX.BuildingBlocks\EntitleX.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\src\EntitleX.Messaging\EntitleX.Messaging.csproj" />
   </ItemGroup>
 
 </Project>

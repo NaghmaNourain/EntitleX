@@ -9,6 +9,8 @@
   <ItemGroup>
     <ProjectReference Include="..\NetworkGuard.Application\NetworkGuard.Application.csproj" />
     <ProjectReference Include="..\NetworkGuard.Domain\NetworkGuard.Domain.csproj" />
+    <ProjectReference Include="..\..\..\EntitleX.Messaging\EntitleX.Messaging.csproj" />
+    <ProjectReference Include="..\..\..\EntitleX.BuildingBlocks\EntitleX.BuildingBlocks.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,6 +21,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
   </ItemGroup>
 

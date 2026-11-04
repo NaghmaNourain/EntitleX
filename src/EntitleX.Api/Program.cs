@@ -45,7 +45,7 @@ try
         {
             Title = "EntitleX API",
             Version = "v1",
-            Description = "Enterprise license-extension control plane (Phase 4 — approvals + JWT/RBAC)."
+            Description = "Enterprise license-extension control plane (Phase 5 — outbox / SQS / Kafka fulfillment)."
         });
 
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme

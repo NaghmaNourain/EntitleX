@@ -1,6 +1,7 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
+using EntitleX.Infrastructure.Outbox;
 using Microsoft.EntityFrameworkCore;
 
 namespace EntitleX.Infrastructure.Persistence;
@@ -19,6 +20,12 @@ public sealed class EntitleXDbContext : DbContext, IUnitOfWork
     public DbSet<ApprovalStage> ApprovalStages => Set<ApprovalStage>();
 
     public DbSet<ApprovalDecision> ApprovalDecisions => Set<ApprovalDecision>();
+
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
+
+    public DbSet<FulfillmentItemResult> FulfillmentItemResults => Set<FulfillmentItemResult>();
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

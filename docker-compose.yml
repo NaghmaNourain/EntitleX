@@ -1,4 +1,4 @@
-# EntitleX local infrastructure (Phase 1)
+# EntitleX local infrastructure (Phase 5 messaging: SQS + Kafka)
 # Usage: docker compose up -d
 # Validate: docker compose config
 
@@ -39,10 +39,17 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_NUM_PARTITIONS: 3
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     ports:
       - "9092:9092"
     volumes:
       - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 20s
 
   localstack:
     image: localstack/localstack:3.8
@@ -54,6 +61,13 @@ services:
       - "4566:4566"
     volumes:
       - localstack_data:/var/lib/localstack
+      - ./infra/docker/localstack/init-sqs.sh:/etc/localstack/init/ready.d/01-init-sqs.sh:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
 
   mailpit:
     image: axllent/mailpit:v1.21

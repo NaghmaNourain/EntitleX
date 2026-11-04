@@ -16,19 +16,22 @@ public sealed class DecideApprovalCommandHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUser _currentUser;
     private readonly IApprovalNotificationService _notifications;
+    private readonly IFulfillmentOutboxService _fulfillmentOutbox;
 
     public DecideApprovalCommandHandler(
         ILicenseExtensionRequestRepository requestRepository,
         IApprovalCaseRepository approvalRepository,
         IUnitOfWork unitOfWork,
         ICurrentUser currentUser,
-        IApprovalNotificationService notifications)
+        IApprovalNotificationService notifications,
+        IFulfillmentOutboxService fulfillmentOutbox)
     {
         _requestRepository = requestRepository;
         _approvalRepository = approvalRepository;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _notifications = notifications;
+        _fulfillmentOutbox = fulfillmentOutbox;
     }
 
     public async Task<ApprovalCaseDto> Handle(
@@ -76,6 +79,14 @@ public sealed class DecideApprovalCommandHandler
         if (approvalCase.Status == ApprovalCaseStatus.Approved)
         {
             request.RecordApproval(ApprovedScopeHasher.Compute(request));
+            var correlation = Guid.TryParse(command.CorrelationId, out var parsed)
+                ? parsed
+                : (Guid?)null;
+            await _fulfillmentOutbox.EnqueueAfterFinalApprovalAsync(
+                request,
+                correlation,
+                causationId: null,
+                cancellationToken);
         }
         else if (approvalCase.Status == ApprovalCaseStatus.Rejected)
         {

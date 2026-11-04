@@ -15,17 +15,20 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
     private readonly IApprovalCaseRepository _approvalRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IApprovalNotificationService _notifications;
+    private readonly IFulfillmentOutboxService _fulfillmentOutbox;
 
     public CreateLicenseExtensionRequestCommandHandler(
         ILicenseExtensionRequestRepository repository,
         IApprovalCaseRepository approvalRepository,
         IUnitOfWork unitOfWork,
-        IApprovalNotificationService notifications)
+        IApprovalNotificationService notifications,
+        IFulfillmentOutboxService fulfillmentOutbox)
     {
         _repository = repository;
         _approvalRepository = approvalRepository;
         _unitOfWork = unitOfWork;
         _notifications = notifications;
+        _fulfillmentOutbox = fulfillmentOutbox;
     }
 
     public async Task<LicenseExtensionRequestDto> Handle(
@@ -60,6 +63,15 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
         var approvalCase = ApprovalCase.Open(aggregate.Id, maxDays, band);
 
         ApplyInitialApprovalTransition(aggregate, band);
+
+        if (aggregate.Status == LicenseExtensionRequestStatus.Approved)
+        {
+            await _fulfillmentOutbox.EnqueueAfterFinalApprovalAsync(
+                aggregate,
+                correlationId: null,
+                causationId: null,
+                cancellationToken);
+        }
 
         await _repository.AddAsync(aggregate, cancellationToken);
         await _approvalRepository.AddAsync(approvalCase, cancellationToken);

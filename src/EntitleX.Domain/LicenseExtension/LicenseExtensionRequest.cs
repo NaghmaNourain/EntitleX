@@ -196,6 +196,58 @@ public sealed class LicenseExtensionRequest : AggregateRoot
         ApprovedScopeHash = approvedScopeHash.Trim();
     }
 
+    /// <summary>
+    /// Moves an approved request into fulfillment after the fulfillment command
+    /// is written to the transactional outbox (same unit of work).
+    /// </summary>
+    public void BeginFulfillment()
+    {
+        TransitionTo(LicenseExtensionRequestStatus.InFulfillment);
+    }
+
+    /// <summary>
+    /// Applies a terminal fulfillment outcome once all item results are known.
+    /// Forward recovery only — never rolls back successful sibling extensions.
+    /// </summary>
+    public void CompleteFulfillment(int succeededCount, int failedCount)
+    {
+        if (Status is not (
+            LicenseExtensionRequestStatus.InFulfillment or
+            LicenseExtensionRequestStatus.PartiallyFulfilled))
+        {
+            throw new DomainException(
+                $"Cannot complete fulfillment from status '{Status}'.");
+        }
+
+        if (succeededCount < 0 || failedCount < 0)
+        {
+            throw new DomainException("Fulfillment outcome counts cannot be negative.");
+        }
+
+        if (succeededCount + failedCount == 0)
+        {
+            throw new DomainException("Fulfillment completion requires at least one item result.");
+        }
+
+        if (failedCount == 0)
+        {
+            TransitionTo(LicenseExtensionRequestStatus.Fulfilled);
+            return;
+        }
+
+        if (succeededCount == 0)
+        {
+            TransitionTo(LicenseExtensionRequestStatus.Failed);
+            return;
+        }
+
+        // Mixed outcomes — forward recovery leaves PartiallyFulfilled for selective retry.
+        if (Status == LicenseExtensionRequestStatus.InFulfillment)
+        {
+            TransitionTo(LicenseExtensionRequestStatus.PartiallyFulfilled);
+        }
+    }
+
     /// <summary>Rejects a request pending approval (or submitted before queueing).</summary>
     public void Reject()
     {
