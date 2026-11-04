@@ -204,7 +204,7 @@
 
 ---
 
-## Phase 6 — Durable saga / forward recovery (current)
+## Phase 6 — Durable saga / forward recovery
 
 **Status:** Complete on branch `cursor/phase-6-saga-bc4f` (based on Phase 5)
 
@@ -251,6 +251,61 @@
 
 ---
 
+## Phase 7 — Selective retry / idempotency (current)
+
+**Status:** Complete on branch `cursor/phase-7-retries-bc4f` (based on Phase 6)
+
+### Verified
+
+| Item | Result |
+|------|--------|
+| `dotnet build EntitleX.sln` | Succeeds (0 warnings, 0 errors) |
+| Domain unit tests | Include failed-item selection, selective-retry factory, approval reuse, multi-generation `ParentId` chains |
+| Application unit tests | Include approval reuse, lost-response idempotency, dual concurrent retry calls, reconcile-uncertain gate, representative authz |
+| Infrastructure concurrency tests | `RetryClaimConcurrencyTests` (Testcontainers / `DockerFact` — skip without Docker) |
+| EF migration `SelectiveRetryIdempotency` | `api_idempotency_records`, `retry_item_claims`, `retry_history`, request `notes` |
+| Docs | `docs/idempotency.md` |
+
+### Delivered in Phase 7
+
+**API**
+
+- `POST /api/v1/license-extensions/{requestId}/retry-failed`
+- AuthZ: `RenewalRepresentative` / `PlatformAdmin` (`CanCreateRequests`)
+- Required `Idempotency-Key` (header or body)
+- Optional notes + LogicalOperationId filter
+- Returns new request id; lost-response replay returns prior retry
+
+**Domain / application**
+
+- `LicenseExtensionRequest.CreateSelectiveRetry` — copy failed items only; preserve `LogicalOperationId`; new `AttemptId`; `ParentId` lineage; notes + `RetryHistory`
+- `FailedItemSelector` + `ApprovalReuseEvaluator` (`ApprovedScopeHash` still valid → auto-approve reuse)
+- `StubReconciliationGate` (`IReconciliationGate`) blocks uncertain / `ReconciliationRequired` (Phase 8 owns full recon)
+- Short Postgres unit of work: claims + request + approval + saga + outbox (no Kafka/SQS/HTTP inside the txn)
+- Async fulfillment via existing outbox dispatch after approval reuse
+
+**Idempotency**
+
+- `api_idempotency_records` — unique key → prior retry id
+- `retry_item_claims` — unique `(source_request_id, logical_operation_id)` prevents overlapping concurrent retries
+- Multi-generation chains (retry of a retry) supported
+
+### Unverified in this environment
+
+| Item | Reason |
+|------|--------|
+| Live Postgres unique-index races under dual HTTP callers | No Docker |
+| Testcontainers `RetryClaimConcurrencyTests` | Docker not available; tests auto-skip |
+| End-to-end retry → outbox → SQS → Kafka | No Docker |
+
+### Explicitly out of scope (Phase 7)
+
+- Full reconciliation repair loop (Phase 8)
+- Approval-reminder / expiration Lambdas (Phase 9)
+- React UI (Phase 10)
+
+---
+
 ## Remaining (roadmap only — not started)
 
-7. Selective retry · 8. Reconciliation · 9. Lambdas · 10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.
+8. Reconciliation · 9. Lambdas · 10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.

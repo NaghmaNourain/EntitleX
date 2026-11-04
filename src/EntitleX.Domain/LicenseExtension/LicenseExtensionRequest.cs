@@ -53,6 +53,7 @@ public sealed class LicenseExtensionRequest : AggregateRoot
         };
 
     private readonly List<LicenseExtensionRequestItem> _items = [];
+    private readonly List<RetryHistoryEntry> _retryHistory = [];
 
     private LicenseExtensionRequest()
     {
@@ -66,7 +67,8 @@ public sealed class LicenseExtensionRequest : AggregateRoot
         string extensionNumber,
         string requestedBy,
         RequestId? parentId,
-        DateTimeOffset createdAtUtc)
+        DateTimeOffset createdAtUtc,
+        string? notes = null)
     {
         Id = id;
         ExtensionNumber = extensionNumber;
@@ -76,6 +78,7 @@ public sealed class LicenseExtensionRequest : AggregateRoot
         ApprovalVersion = 0;
         ApprovedScopeHash = null;
         CreatedAtUtc = createdAtUtc;
+        Notes = notes;
     }
 
     public RequestId Id { get; private set; }
@@ -98,14 +101,20 @@ public sealed class LicenseExtensionRequest : AggregateRoot
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
+    /// <summary>Optional operator notes (including selective-retry rationale).</summary>
+    public string? Notes { get; private set; }
+
     /// <summary>Optimistic concurrency token (persisted as row_version).</summary>
     public uint RowVersion { get; private set; }
 
     public IReadOnlyList<LicenseExtensionRequestItem> Items => _items.AsReadOnly();
 
+    /// <summary>Append-only history of selective retries spawned from this request.</summary>
+    public IReadOnlyList<RetryHistoryEntry> RetryHistory => _retryHistory.AsReadOnly();
+
     /// <summary>
     /// Creates a fresh request. <paramref name="parentId"/> must be null;
-    /// use a dedicated retry factory in a later phase for parent lineage.
+    /// use <see cref="CreateSelectiveRetry"/> for parent lineage.
     /// </summary>
     public static LicenseExtensionRequest CreateFresh(
         string extensionNumber,
@@ -170,6 +179,132 @@ public sealed class LicenseExtensionRequest : AggregateRoot
             request.CreatedAtUtc));
 
         return request;
+    }
+
+    /// <summary>
+    /// Selective retry factory: copies only the supplied failed parent items,
+    /// preserves each <see cref="LogicalOperationId"/>, mints new <see cref="AttemptId"/>s,
+    /// and chains via <see cref="ParentId"/>. Successful siblings are never copied
+    /// (forward recovery).
+    /// </summary>
+    public static LicenseExtensionRequest CreateSelectiveRetry(
+        LicenseExtensionRequest parent,
+        IReadOnlyList<LicenseExtensionRequestItem> failedItemsToRetry,
+        string extensionNumber,
+        string requestedBy,
+        string? notes = null,
+        DateTimeOffset? createdAtUtc = null)
+    {
+        ArgumentNullException.ThrowIfNull(parent);
+        ArgumentNullException.ThrowIfNull(failedItemsToRetry);
+
+        if (parent.Status is not (
+            LicenseExtensionRequestStatus.PartiallyFulfilled or
+            LicenseExtensionRequestStatus.Failed))
+        {
+            throw new DomainException(
+                $"Selective retry requires parent status PartiallyFulfilled or Failed (was '{parent.Status}').");
+        }
+
+        if (string.IsNullOrWhiteSpace(extensionNumber))
+        {
+            throw new DomainException("ExtensionNumber is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(requestedBy))
+        {
+            throw new DomainException("RequestedBy is required.");
+        }
+
+        if (failedItemsToRetry.Count == 0)
+        {
+            throw new DomainException("Selective retry requires at least one failed item.");
+        }
+
+        if (failedItemsToRetry.Count > MaxItems)
+        {
+            throw new DomainException(
+                $"A license-extension request cannot contain more than {MaxItems} items.");
+        }
+
+        var parentItemIds = parent.Items.Select(i => i.Id).ToHashSet();
+        foreach (var item in failedItemsToRetry)
+        {
+            if (!parentItemIds.Contains(item.Id))
+            {
+                throw new DomainException(
+                    $"Retry item '{item.Id}' does not belong to parent request '{parent.Id}'.");
+            }
+        }
+
+        var distinctLogical = failedItemsToRetry
+            .Select(i => i.LogicalOperationId)
+            .Distinct()
+            .Count();
+        if (distinctLogical != failedItemsToRetry.Count)
+        {
+            throw new DomainException("Selective retry items must have distinct LogicalOperationIds.");
+        }
+
+        var now = createdAtUtc ?? DateTimeOffset.UtcNow;
+        var trimmedNotes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        var request = new LicenseExtensionRequest(
+            RequestId.New(),
+            extensionNumber.Trim(),
+            requestedBy.Trim(),
+            parent.Id,
+            now,
+            trimmedNotes);
+
+        foreach (var source in failedItemsToRetry)
+        {
+            request._items.Add(LicenseExtensionRequestItem.Create(
+                source.EntitlementId,
+                source.Provider,
+                source.CurrentExpiryUtc,
+                source.RequestedExpiryUtc,
+                logicalOperationId: source.LogicalOperationId,
+                attemptId: AttemptId.New()));
+        }
+
+        request.RaiseDomainEvent(new LicenseExtensionRequestCreatedDomainEvent(
+            request.Id,
+            request.ExtensionNumber,
+            request.CreatedAtUtc));
+
+        return request;
+    }
+
+    /// <summary>
+    /// Records that a selective retry was spawned from this request (append-only).
+    /// </summary>
+    public void RecordSelectiveRetrySpawned(
+        LicenseExtensionRequest retry,
+        string createdBy,
+        string? notes = null,
+        DateTimeOffset? atUtc = null)
+    {
+        ArgumentNullException.ThrowIfNull(retry);
+
+        if (retry.ParentId is null || !retry.ParentId.Equals(Id))
+        {
+            throw new DomainException(
+                $"Retry '{retry.Id}' is not a child of source '{Id}'.");
+        }
+
+        if (_retryHistory.Any(h => h.RetryRequestId.Equals(retry.Id)))
+        {
+            return;
+        }
+
+        _retryHistory.Add(RetryHistoryEntry.Create(
+            Id,
+            retry.Id,
+            retry.ExtensionNumber,
+            retry.Items.Count,
+            createdBy.Trim(),
+            string.IsNullOrWhiteSpace(notes) ? retry.Notes : notes.Trim(),
+            atUtc ?? DateTimeOffset.UtcNow));
     }
 
     public void Submit()

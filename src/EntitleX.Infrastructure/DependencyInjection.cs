@@ -7,6 +7,7 @@ using EntitleX.Infrastructure.Outbox;
 using EntitleX.Infrastructure.Persistence;
 using EntitleX.Infrastructure.Persistence.Repositories;
 using EntitleX.Infrastructure.Providers;
+using EntitleX.Infrastructure.Retry;
 using EntitleX.Messaging;
 using EntitleX.Messaging.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -43,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<OutboxClaimer>();
         services.AddScoped<OutboxPublisherService>();
         services.AddScoped<IConsumerIdempotencyStore, EfConsumerIdempotencyStore>();
+        services.AddScoped<IRetryClaimStore, EfRetryClaimStore>();
         services.AddScoped<ProviderResultProcessor>();
 
         services.AddEntitleXMessaging(configuration);

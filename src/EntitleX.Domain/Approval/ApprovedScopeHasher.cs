@@ -16,10 +16,29 @@ public static class ApprovedScopeHasher
         var builder = new StringBuilder();
         builder.Append(request.Id.Value.ToString("D"));
         builder.Append('|');
+        AppendItems(builder, request.Items);
 
-        foreach (var item in request.Items
+        return Hash(builder.ToString());
+    }
+
+    /// <summary>
+    /// Item-only fingerprint (no request id) used when comparing approved scopes
+    /// across selective-retry generations that share <c>LogicalOperationId</c>s.
+    /// </summary>
+    public static string ComputeItemScope(IEnumerable<LicenseExtensionRequestItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        var builder = new StringBuilder();
+        AppendItems(builder, items);
+        return Hash(builder.ToString());
+    }
+
+    private static void AppendItems(StringBuilder builder, IEnumerable<LicenseExtensionRequestItem> items)
+    {
+        foreach (var item in items
                      .OrderBy(i => i.EntitlementId.Value, StringComparer.Ordinal)
-                     .ThenBy(i => i.Provider.ToString(), StringComparer.Ordinal))
+                     .ThenBy(i => i.Provider.ToString(), StringComparer.Ordinal)
+                     .ThenBy(i => i.LogicalOperationId.Value))
         {
             builder.Append(item.EntitlementId.Value);
             builder.Append(':');
@@ -32,8 +51,11 @@ public static class ApprovedScopeHasher
             builder.Append(item.LogicalOperationId.Value.ToString("D"));
             builder.Append(';');
         }
+    }
 
-        var bytes = Encoding.UTF8.GetBytes(builder.ToString());
+    private static string Hash(string payload)
+    {
+        var bytes = Encoding.UTF8.GetBytes(payload);
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
