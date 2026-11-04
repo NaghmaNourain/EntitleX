@@ -48,7 +48,7 @@ services:
     image: localstack/localstack:3.8
     container_name: entitlex-localstack
     environment:
-      SERVICES: s3,sqs,sns,lambda,secretsmanager,sts,iam
+      SERVICES: s3,sqs,sns,ses,lambda,secretsmanager,sts,iam
       DEBUG: 0
     ports:
       - "4566:4566"

@@ -1,4 +1,5 @@
 using EntitleX.Application.Common.Exceptions;
+using EntitleX.Domain.Approval;
 using EntitleX.Domain.Common;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
@@ -63,6 +64,16 @@ public static class ExceptionHandlingExtensions
                 StatusCodes.Status409Conflict,
                 "Conflict",
                 conflict.Message,
+                null),
+            ForbiddenException forbidden => (
+                StatusCodes.Status403Forbidden,
+                "Forbidden",
+                forbidden.Message,
+                null),
+            UnauthorizedApprovalTransitionException unauthorized => (
+                StatusCodes.Status403Forbidden,
+                "Forbidden",
+                unauthorized.Message,
                 null),
             DomainException domain => (
                 StatusCodes.Status422UnprocessableEntity,

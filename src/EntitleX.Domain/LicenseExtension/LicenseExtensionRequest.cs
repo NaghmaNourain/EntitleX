@@ -183,7 +183,7 @@ public sealed class LicenseExtensionRequest : AggregateRoot
         TransitionTo(LicenseExtensionRequestStatus.PendingApproval);
     }
 
-    /// <summary>Phase 2 stub: records an approved scope hash and bumps ApprovalVersion.</summary>
+    /// <summary>Records an approved scope hash and bumps ApprovalVersion.</summary>
     public void RecordApproval(string approvedScopeHash)
     {
         if (string.IsNullOrWhiteSpace(approvedScopeHash))
@@ -196,7 +196,18 @@ public sealed class LicenseExtensionRequest : AggregateRoot
         ApprovedScopeHash = approvedScopeHash.Trim();
     }
 
-    /// <summary>Phase 2 stub for cancelled requests.</summary>
+    /// <summary>Rejects a request pending approval (or submitted before queueing).</summary>
+    public void Reject()
+    {
+        if (Status == LicenseExtensionRequestStatus.Submitted)
+        {
+            TransitionTo(LicenseExtensionRequestStatus.PendingApproval);
+        }
+
+        TransitionTo(LicenseExtensionRequestStatus.Rejected);
+    }
+
+    /// <summary>Cancels a request that is still cancellable.</summary>
     public void Cancel()
     {
         TransitionTo(LicenseExtensionRequestStatus.Cancelled);

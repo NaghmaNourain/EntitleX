@@ -1,5 +1,7 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
+using EntitleX.Infrastructure.Identity;
+using EntitleX.Infrastructure.Notifications;
 using EntitleX.Infrastructure.Persistence;
 using EntitleX.Infrastructure.Persistence.Repositories;
 using EntitleX.Infrastructure.Providers;
@@ -31,16 +33,42 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EntitleXDbContext>());
         services.AddScoped<ILicenseExtensionRequestRepository, LicenseExtensionRequestRepository>();
+        services.AddScoped<IApprovalCaseRepository, ApprovalCaseRepository>();
 
         services.AddProviderHttpClients(configuration);
 
         services.AddTransient<IProviderEntitlementClient, CloudShieldEntitlementClient>();
         services.AddTransient<IProviderEntitlementClient, NetworkGuardEntitlementClient>();
 
+        services.AddEntitleXAuthentication(configuration);
+        services.AddEntitleXEmail(configuration);
+
         services.AddHealthChecks()
             .Add(CreateProviderRegistration("cloudshield", "CloudShield"))
             .Add(CreateProviderRegistration("networkguard", "NetworkGuard"));
 
+        return services;
+    }
+
+    public static IServiceCollection AddEntitleXEmail(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+
+        var provider = configuration.GetValue<string>($"{EmailOptions.SectionName}:Provider")
+            ?? "Smtp";
+
+        if (string.Equals(provider, "Ses", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IEmailSender, SesEmailSender>();
+        }
+        else
+        {
+            services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        }
+
+        services.AddScoped<IApprovalNotificationService, ApprovalNotificationService>();
         return services;
     }
 

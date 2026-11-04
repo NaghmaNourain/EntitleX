@@ -23,6 +23,167 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("EntitleX.Domain.Approval.ApprovalCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Band")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("band");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at_utc");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int>("CurrentStageOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("current_stage_order");
+
+                    b.Property<int>("MaxExtensionDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_extension_days");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_approval_cases_request_id");
+
+                    b.ToTable("approval_cases", "public");
+                });
+
+            modelBuilder.Entity("EntitleX.Domain.Approval.ApprovalDecision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActorDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("actor_display_name");
+
+                    b.Property<string>("ActorRole")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("actor_role");
+
+                    b.Property<string>("ActorUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<Guid>("ApprovalCaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval_case_id");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("comment");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<DateTimeOffset>("DecidedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at_utc");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<int>("StageOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage_order");
+
+                    b.Property<string>("StageRole")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("stage_role");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovalCaseId");
+
+                    b.HasIndex("DecidedAtUtc")
+                        .HasDatabaseName("ix_approval_decisions_decided_at_utc");
+
+                    b.HasIndex("RequestId")
+                        .HasDatabaseName("ix_approval_decisions_request_id");
+
+                    b.ToTable("approval_decisions", "public");
+                });
+
+            modelBuilder.Entity("EntitleX.Domain.Approval.ApprovalStage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApprovalCaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval_case_id");
+
+                    b.Property<Guid?>("DecisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decision_id");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage_order");
+
+                    b.Property<string>("RequiredRole")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("required_role");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovalCaseId", "Order")
+                        .IsUnique()
+                        .HasDatabaseName("ux_approval_stages_case_order");
+
+                    b.ToTable("approval_stages", "public");
+                });
+
             modelBuilder.Entity("EntitleX.Domain.LicenseExtension.LicenseExtensionRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -141,6 +302,24 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                     b.ToTable("license_extension_request_items", "public");
                 });
 
+            modelBuilder.Entity("EntitleX.Domain.Approval.ApprovalDecision", b =>
+                {
+                    b.HasOne("EntitleX.Domain.Approval.ApprovalCase", null)
+                        .WithMany("Decisions")
+                        .HasForeignKey("ApprovalCaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EntitleX.Domain.Approval.ApprovalStage", b =>
+                {
+                    b.HasOne("EntitleX.Domain.Approval.ApprovalCase", null)
+                        .WithMany("Stages")
+                        .HasForeignKey("ApprovalCaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("EntitleX.Domain.LicenseExtension.LicenseExtensionRequest", b =>
                 {
                     b.HasOne("EntitleX.Domain.LicenseExtension.LicenseExtensionRequest", null)
@@ -156,6 +335,13 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("EntitleX.Domain.Approval.ApprovalCase", b =>
+                {
+                    b.Navigation("Decisions");
+
+                    b.Navigation("Stages");
                 });
 
             modelBuilder.Entity("EntitleX.Domain.LicenseExtension.LicenseExtensionRequest", b =>

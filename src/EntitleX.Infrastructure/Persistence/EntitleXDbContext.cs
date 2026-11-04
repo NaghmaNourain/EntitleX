@@ -1,4 +1,5 @@
 using EntitleX.Application.Abstractions;
+using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +13,12 @@ public sealed class EntitleXDbContext : DbContext, IUnitOfWork
     }
 
     public DbSet<LicenseExtensionRequest> LicenseExtensionRequests => Set<LicenseExtensionRequest>();
+
+    public DbSet<ApprovalCase> ApprovalCases => Set<ApprovalCase>();
+
+    public DbSet<ApprovalStage> ApprovalStages => Set<ApprovalStage>();
+
+    public DbSet<ApprovalDecision> ApprovalDecisions => Set<ApprovalDecision>();
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
