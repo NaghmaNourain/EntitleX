@@ -2,6 +2,7 @@ using EntitleX.Api.Endpoints;
 using EntitleX.Api.Infrastructure;
 using EntitleX.Api.Middleware;
 using EntitleX.Application;
+using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Infrastructure;
 using EntitleX.Infrastructure.Identity;
 using EntitleX.Infrastructure.Persistence;
@@ -11,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Serilog;
+using Serilog.Events;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -23,10 +25,14 @@ try
     builder.Host.UseSerilog((context, services, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
+        .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
         .Enrich.FromLogContext()
         .Enrich.WithProperty("Service", "EntitleX.Api")
+        .Enrich.WithEnvironmentName()
+        .Enrich.WithMachineName()
         .WriteTo.Console());
 
+    builder.Services.AddEntitleXOpenTelemetry(builder.Configuration, "EntitleX.Api", isAspNetCoreHost: true);
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -45,7 +51,7 @@ try
         {
             Title = "EntitleX API",
             Version = "v1",
-            Description = "Enterprise license-extension control plane (Phase 10 — React BFF + ops/audit reads)."
+            Description = "Enterprise license-extension control plane (Phase 11 — OpenTelemetry + metrics)."
         });
 
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -115,6 +121,7 @@ try
     {
         Predicate = check => check.Tags.Contains("provider")
     }).AllowAnonymous();
+    app.MapEntitleXPrometheusScrapingEndpoint();
 
     app.MapLicenseExtensionEndpoints();
     app.MapLicenseExtensionRetryEndpoints();

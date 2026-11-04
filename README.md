@@ -2,7 +2,7 @@
 
 Enterprise license-extension platform (portfolio). Orchestrates extension requests across fictional vendor systems **CloudShield** and **NetworkGuard**. No proprietary IP.
 
-Phase 10 adds the React control-plane UI (Vite + TanStack Query + MUI). See [docs/implementation-progress.md](docs/implementation-progress.md), [frontend/README.md](frontend/README.md), [docs/saga-workflow.md](docs/saga-workflow.md), and [docs/event-contracts.md](docs/event-contracts.md).
+Phase 11 adds OpenTelemetry (Jaeger), Prometheus/Grafana dashboards, structured Serilog, and performance hardening. See [docs/observability.md](docs/observability.md), [docs/performance.md](docs/performance.md), [docs/implementation-progress.md](docs/implementation-progress.md), and [frontend/README.md](frontend/README.md).
 
 ## Architecture
 
@@ -149,8 +149,8 @@ dotnet run --project src/workers/EntitleX.NotificationService
 | LocalStack  | `4566`                        | SQS (`entitlex-fulfillment` + DLQ) + SES   |
 | Mailpit     | `1025` (SMTP), `8025` (UI)    | Dev email                                  |
 | Jaeger      | `16686` (UI), `4317`/`4318`   | OTLP collectors                            |
-| Prometheus  | `9090`                        | Metrics                                    |
-| Grafana     | `3001`                        | UI (`admin` / `admin`) — host 3001 → 3000  |
+| Prometheus  | `9090`                        | Scrapes API `/metrics` + worker `:9180–9183` |
+| Grafana     | `3001`                        | UI (`admin` / `admin`); EntitleX Overview dashboard |
 
 Postgres init creates databases: `entitlex_platform`, `cloudshield`, `networkguard`. LocalStack init creates SQS queues on ready.
 

@@ -1,6 +1,6 @@
 namespace EntitleX.Messaging.Abstractions;
 
-/// <summary>Metrics hooks for outbox publishing (Phase 5 stubs; wire OTel later).</summary>
+/// <summary>Metrics hooks for outbox publishing (OpenTelemetry-backed in Phase 11).</summary>
 public interface IOutboxMetrics
 {
     void RecordClaimed(int count);

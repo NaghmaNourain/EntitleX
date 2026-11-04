@@ -24,9 +24,14 @@ public static class AuditEndpoints
     private static async Task<IResult> GetByRequestAsync(
         Guid requestId,
         ISender sender,
+        int? take,
+        DateTimeOffset? afterOccurredAtUtc,
+        Guid? afterId,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new GetRequestAuditQuery(requestId), cancellationToken);
+        var result = await sender.Send(
+            new GetRequestAuditQuery(requestId, take, afterOccurredAtUtc, afterId),
+            cancellationToken);
         return Results.Ok(result);
     }
 }

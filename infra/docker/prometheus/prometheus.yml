@@ -6,3 +6,54 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
+
+  # Host-run ASP.NET apps (Compose uses host.docker.internal → host-gateway)
+  - job_name: entitlex-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:5080"]
+        labels:
+          service: EntitleX.Api
+
+  - job_name: cloudshield-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:5081"]
+        labels:
+          service: CloudShield.Api
+
+  - job_name: networkguard-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:5082"]
+        labels:
+          service: NetworkGuard.Api
+
+  # Worker Prometheus HttpListener prefixes
+  - job_name: entitlex-outbox-publisher
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:9180"]
+        labels:
+          service: EntitleX.OutboxPublisher
+
+  - job_name: entitlex-fulfillment-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:9181"]
+        labels:
+          service: EntitleX.FulfillmentWorker
+
+  - job_name: entitlex-reconciliation-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:9182"]
+        labels:
+          service: EntitleX.ReconciliationWorker
+
+  - job_name: entitlex-notification-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:9183"]
+        labels:
+          service: EntitleX.NotificationService

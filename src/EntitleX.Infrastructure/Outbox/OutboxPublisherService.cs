@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Text.Json;
+using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Infrastructure.Persistence;
 using EntitleX.Messaging.Abstractions;
 using EntitleX.Messaging.Contracts;
@@ -42,8 +44,13 @@ public sealed class OutboxPublisherService
 
     public async Task<int> PublishOnceAsync(CancellationToken cancellationToken)
     {
+        using var batchActivity = EntitleXActivitySources.Outbox.StartActivity(
+            "outbox.publish_batch",
+            ActivityKind.Internal);
+
         var claimed = await _claimer.ClaimBatchAsync(_workerId, cancellationToken);
         _metrics.RecordClaimed(claimed.Count);
+        batchActivity?.SetTag("outbox.claimed", claimed.Count);
 
         foreach (var message in claimed)
         {
@@ -56,6 +63,13 @@ public sealed class OutboxPublisherService
 
     private async Task PublishOneAsync(OutboxMessage message, CancellationToken cancellationToken)
     {
+        using var activity = EntitleXActivitySources.Outbox.StartActivity(
+            "outbox.publish",
+            ActivityKind.Producer);
+        activity?.SetTag("messaging.destination", message.Destination);
+        activity?.SetTag("messaging.system", message.DestinationKind.ToString());
+        activity?.SetTag("outbox.message_type", message.MessageType);
+
         try
         {
             var envelope = BuildEnvelope(message);
@@ -79,6 +93,7 @@ public sealed class OutboxPublisherService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             _logger.LogError(
                 ex,
                 "Failed to publish outbox message {OutboxId} type {MessageType} attempt {Attempt}",

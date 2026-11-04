@@ -14,10 +14,12 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.0.11" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
+    <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\EntitleX.BuildingBlocks\EntitleX.BuildingBlocks.csproj" />
     <ProjectReference Include="..\CloudShield.Application\CloudShield.Application.csproj" />
     <ProjectReference Include="..\CloudShield.Infrastructure\CloudShield.Infrastructure.csproj" />
   </ItemGroup>

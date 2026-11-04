@@ -422,6 +422,9 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                     b.HasIndex("TimeoutDeadlineUtc")
                         .HasDatabaseName("ix_license_extension_sagas_timeout_deadline_utc");
 
+                    b.HasIndex("State", "UpdatedAtUtc")
+                        .HasDatabaseName("ix_license_extension_sagas_state_updated");
+
                     b.ToTable("license_extension_sagas", "public");
                 });
 
@@ -586,6 +589,9 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                     b.HasIndex("OccurredAtUtc");
 
                     b.HasIndex("RequestId");
+
+                    b.HasIndex("RequestId", "OccurredAtUtc", "Id")
+                        .HasDatabaseName("ix_audit_events_request_occurred_id");
 
                     b.ToTable("audit_events", "public");
                 });
@@ -859,6 +865,9 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Status", "AvailableAtUtc")
                         .HasDatabaseName("ix_outbox_messages_status_available");
+
+                    b.HasIndex("Status", "LockedUntilUtc")
+                        .HasDatabaseName("ix_outbox_messages_status_locked");
 
                     b.ToTable("outbox_messages", "public");
                 });

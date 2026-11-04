@@ -3,6 +3,7 @@ using CloudShield.Application;
 using CloudShield.Infrastructure;
 using CloudShield.Infrastructure.Persistence;
 using CloudShield.Infrastructure.Seeding;
+using EntitleX.BuildingBlocks.Observability;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -19,8 +20,11 @@ try
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
         .Enrich.WithProperty("Service", "CloudShield.Api")
+        .Enrich.WithEnvironmentName()
+        .Enrich.WithMachineName()
         .WriteTo.Console());
 
+    builder.Services.AddEntitleXOpenTelemetry(builder.Configuration, "CloudShield.Api", isAspNetCoreHost: true);
     builder.Services.AddCloudShieldApplication();
     builder.Services.AddCloudShieldInfrastructure(builder.Configuration);
 
@@ -47,6 +51,7 @@ try
     }));
 
     app.MapHealthChecks("/health/ready");
+    app.MapEntitleXPrometheusScrapingEndpoint();
     app.MapCloudShieldEntitlementEndpoints();
 
     if (ShouldMigrateOnStartup(app.Configuration))

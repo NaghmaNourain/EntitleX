@@ -407,7 +407,7 @@
 
 ---
 
-## Phase 10 — React frontend (current)
+## Phase 10 — React frontend
 
 **Status:** Complete on branch `cursor/phase-10-frontend-bc4f` (based on Phase 9)
 
@@ -469,6 +469,64 @@
 
 ---
 
+## Phase 11 — Observability and performance (current)
+
+**Status:** Complete on branch `cursor/phase-11-observability-bc4f` (based on Phase 10)
+
+### Verified
+
+| Item | Result |
+|------|--------|
+| `dotnet build EntitleX.sln` | Succeeds (0 warnings, 0 errors) |
+| Domain / Application unit tests | Passed |
+| Compose YAML / Grafana JSON | Parsed successfully (`docker` binary unavailable in agent) |
+
+### Delivered in Phase 11
+
+**OpenTelemetry**
+
+- Shared helpers in `EntitleX.BuildingBlocks/Observability` (`ActivitySource`s, meters, host DI)
+- W3C trace context; OTLP export to Jaeger (`:4317`)
+- Instrumentation: ASP.NET, HttpClient, EF Core, SQS/Kafka produce/consume, saga transitions, outbox publish, reconciliation, provider latency
+- Traceparent attributes/headers on SQS/Kafka messages
+
+**Prometheus + Grafana**
+
+- `/metrics` on API + simulators; worker HttpListener ports `9180–9183`
+- Compose Prometheus scrapes `host.docker.internal` targets
+- Grafana datasource + **EntitleX Overview** dashboard (request duration, approval latency, fulfillment outcomes, retries, recon/outbox backlog, SQS depth, Kafka lag hook, provider latency, circuit breaker, saga transitions)
+- **No high-cardinality ID labels**
+
+**Serilog**
+
+- Structured console + Service/environment/machine enrichers on API, workers, simulators, lambdas
+- CloudWatch notes in `docs/observability.md`
+
+**Performance**
+
+- Batch inserts for ≤1000 items (`MaxBatchSize(100)` + AutoDetectChanges off on attach)
+- Indexes: audit keyset, saga state+updated, outbox status+locked
+- Keyset pagination for audit (+ optional pending-approvals cursors)
+- `AsNoTracking` on saga GET / existence checks; connection pooling notes in `docs/performance.md`
+
+### Docs
+
+- `docs/observability.md`, `docs/performance.md`
+
+### Unverified in this environment
+
+| Item | Reason |
+|------|--------|
+| Live Jaeger/Prometheus/Grafana scrape against running hosts | Compose may be unavailable; exporters wired but not soak-tested |
+| EMF / CloudWatch sink in AWS | Documented only |
+| True Kafka consumer-group lag (admin client) | Best-effort watermark hook only |
+
+### Explicitly out of scope (Phase 11)
+
+- Terraform / CI pack / docs polish (Phase 12)
+
+---
+
 ## Remaining (roadmap only — not started)
 
-11. Observability/perf · 12. Terraform/CI/docs pack.
+12. Terraform/CI/docs pack.

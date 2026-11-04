@@ -2,6 +2,7 @@ using EntitleX.Application.Abstractions;
 using EntitleX.Application.Approval.Models;
 using EntitleX.Application.Common.Exceptions;
 using EntitleX.BuildingBlocks.Ids;
+using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
 using MediatR;
@@ -75,6 +76,11 @@ public sealed class DecideApprovalCommandHandler
         {
             throw new ForbiddenException(ex.Message);
         }
+
+        ApprovalTelemetry.RecordDecisionLatency(
+            DateTimeOffset.UtcNow - approvalCase.CreatedAtUtc,
+            decision.Outcome.ToString(),
+            decision.StageRole.ToString());
 
         await _sagaOrchestrator.OnApprovalDecisionAsync(
             request,

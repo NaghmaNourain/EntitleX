@@ -1,7 +1,10 @@
+using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using Confluent.Kafka;
 using EntitleX.Messaging.Abstractions;
 using EntitleX.Messaging.Contracts;
+using EntitleX.Messaging.Metrics;
 using EntitleX.Messaging.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -34,27 +37,55 @@ public sealed class KafkaMessagePublisher : IKafkaMessagePublisher, IDisposable
         MessageEnvelope envelope,
         CancellationToken cancellationToken = default)
     {
-        var body = JsonSerializer.Serialize(envelope, MessagingJson.Options);
-        var message = new Message<string, string>
-        {
-            Key = partitionKey ?? envelope.MessageId.ToString("D"),
-            Value = body,
-            Headers =
-            [
-                new Header("message-type", System.Text.Encoding.UTF8.GetBytes(envelope.MessageType)),
-                new Header("schema-version", System.Text.Encoding.UTF8.GetBytes(envelope.SchemaVersion)),
-                new Header("message-id", System.Text.Encoding.UTF8.GetBytes(envelope.MessageId.ToString("D")))
-            ]
-        };
+        using var activity = MessagingTelemetry.StartProduce("kafka", topic);
+        var sw = Stopwatch.StartNew();
+        var success = false;
 
-        var result = await _producer.ProduceAsync(topic, message, cancellationToken);
-        _logger.LogDebug(
-            "Published Kafka message {MessageId} type {MessageType} to {Topic} partition {Partition} offset {Offset}",
-            envelope.MessageId,
-            envelope.MessageType,
-            topic,
-            result.Partition.Value,
-            result.Offset.Value);
+        try
+        {
+            var body = JsonSerializer.Serialize(envelope, MessagingJson.Options);
+            var headers = new Headers
+            {
+                { "message-type", Encoding.UTF8.GetBytes(envelope.MessageType) },
+                { "schema-version", Encoding.UTF8.GetBytes(envelope.SchemaVersion) },
+                { "message-id", Encoding.UTF8.GetBytes(envelope.MessageId.ToString("D")) }
+            };
+
+            if (Activity.Current is { } current && current.Id is not null)
+            {
+                headers.Add("traceparent", Encoding.UTF8.GetBytes(current.Id));
+                if (!string.IsNullOrEmpty(current.TraceStateString))
+                {
+                    headers.Add("tracestate", Encoding.UTF8.GetBytes(current.TraceStateString));
+                }
+            }
+
+            var message = new Message<string, string>
+            {
+                Key = partitionKey ?? envelope.MessageId.ToString("D"),
+                Value = body,
+                Headers = headers
+            };
+
+            var result = await _producer.ProduceAsync(topic, message, cancellationToken);
+            success = true;
+            _logger.LogDebug(
+                "Published Kafka message {MessageId} type {MessageType} to {Topic} partition {Partition} offset {Offset}",
+                envelope.MessageId,
+                envelope.MessageType,
+                topic,
+                result.Partition.Value,
+                result.Offset.Value);
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            throw;
+        }
+        finally
+        {
+            MessagingTelemetry.RecordOperation("kafka", "publish", topic, sw.Elapsed.TotalSeconds, success);
+        }
     }
 
     public void Dispose() => _producer.Dispose();

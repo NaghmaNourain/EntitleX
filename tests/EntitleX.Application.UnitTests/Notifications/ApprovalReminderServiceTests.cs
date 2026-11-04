@@ -166,6 +166,11 @@ public sealed class ApprovalReminderServiceTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<LicenseExtensionSaga?>(saga.RequestId == requestId ? saga : null);
 
+        public Task<LicenseExtensionSaga?> GetByRequestIdReadOnlyAsync(
+            RequestId requestId,
+            CancellationToken cancellationToken = default) =>
+            GetByRequestIdAsync(requestId, cancellationToken);
+
         public Task<LicenseExtensionSaga?> GetByIdAsync(
             Guid id,
             CancellationToken cancellationToken = default) =>
@@ -284,6 +289,14 @@ public sealed class ApprovalReminderServiceTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<AuditEventRecord>>(
                 Events.Where(e => e.RequestId == requestId).ToList());
+
+        public Task<IReadOnlyList<AuditEventRecord>> ListByRequestKeysetAsync(
+            RequestId requestId,
+            int take,
+            DateTimeOffset? afterOccurredAtUtc,
+            Guid? afterId,
+            CancellationToken cancellationToken = default) =>
+            ListByRequestAsync(requestId, cancellationToken);
     }
 
     private sealed class FakeUnitOfWork : IUnitOfWork

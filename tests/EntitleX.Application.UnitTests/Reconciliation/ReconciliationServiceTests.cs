@@ -287,6 +287,14 @@ public sealed class ReconciliationServiceTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<AuditEventRecord>>(
                 Events.Where(e => e.RequestId?.Equals(requestId) == true).ToList());
+
+        public Task<IReadOnlyList<AuditEventRecord>> ListByRequestKeysetAsync(
+            RequestId requestId,
+            int take,
+            DateTimeOffset? afterOccurredAtUtc,
+            Guid? afterId,
+            CancellationToken cancellationToken = default) =>
+            ListByRequestAsync(requestId, cancellationToken);
     }
 
     private sealed class FakeSagaRepository(LicenseExtensionSaga saga) : ILicenseExtensionSagaRepository
@@ -299,6 +307,11 @@ public sealed class ReconciliationServiceTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<LicenseExtensionSaga?>(
                 saga.RequestId.Equals(requestId) ? saga : null);
+
+        public Task<LicenseExtensionSaga?> GetByRequestIdReadOnlyAsync(
+            RequestId requestId,
+            CancellationToken cancellationToken = default) =>
+            GetByRequestIdAsync(requestId, cancellationToken);
 
         public Task<LicenseExtensionSaga?> GetByIdAsync(
             Guid id,

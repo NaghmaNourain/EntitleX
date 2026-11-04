@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using EntitleX.Messaging.Contracts;
+using EntitleX.Messaging.Metrics;
 using EntitleX.Messaging.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -39,59 +41,76 @@ public sealed class SqsFulfillmentConsumer
     public async Task<IReadOnlyList<SqsReceivedMessage>> ReceiveAsync(
         CancellationToken cancellationToken = default)
     {
-        var queueUrl = await _publisher.ResolveQueueUrlAsync(
-            _options.FulfillmentQueueName,
-            cancellationToken);
+        var destination = _options.FulfillmentQueueName;
+        using var activity = MessagingTelemetry.StartConsume("sqs", destination);
+        var sw = Stopwatch.StartNew();
+        var success = false;
 
-        var response = await _publisher.Client.ReceiveMessageAsync(
-            new ReceiveMessageRequest
-            {
-                QueueUrl = queueUrl,
-                MaxNumberOfMessages = Math.Clamp(_options.MaxNumberOfMessages, 1, 10),
-                WaitTimeSeconds = Math.Clamp(_options.WaitTimeSeconds, 0, 20),
-                VisibilityTimeout = Math.Clamp(_options.VisibilityTimeoutSeconds, 1, 43200),
-                MessageAttributeNames = ["All"],
-                MessageSystemAttributeNames = ["ApproximateReceiveCount"]
-            },
-            cancellationToken);
-
-        if (response.Messages is null || response.Messages.Count == 0)
+        try
         {
-            return [];
-        }
+            var queueUrl = await _publisher.ResolveQueueUrlAsync(destination, cancellationToken);
 
-        var results = new List<SqsReceivedMessage>(response.Messages.Count);
-        foreach (var message in response.Messages)
-        {
-            try
-            {
-                var envelope = JsonSerializer.Deserialize<MessageEnvelope>(
-                    message.Body,
-                    MessagingJson.Options)
-                    ?? throw new InvalidOperationException("SQS body deserialized to null envelope.");
-
-                var receiveCount = 1;
-                if (message.Attributes.TryGetValue("ApproximateReceiveCount", out var raw)
-                    && int.TryParse(raw, out var parsed))
+            var response = await _publisher.Client.ReceiveMessageAsync(
+                new ReceiveMessageRequest
                 {
-                    receiveCount = parsed;
-                }
-
-                results.Add(new SqsReceivedMessage
-                {
-                    Envelope = envelope,
-                    ReceiptHandle = message.ReceiptHandle,
                     QueueUrl = queueUrl,
-                    ApproximateReceiveCount = receiveCount
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to deserialize SQS message; leaving for retry/DLQ");
-            }
-        }
+                    MaxNumberOfMessages = Math.Clamp(_options.MaxNumberOfMessages, 1, 10),
+                    WaitTimeSeconds = Math.Clamp(_options.WaitTimeSeconds, 0, 20),
+                    VisibilityTimeout = Math.Clamp(_options.VisibilityTimeoutSeconds, 1, 43200),
+                    MessageAttributeNames = ["All"],
+                    MessageSystemAttributeNames = ["ApproximateReceiveCount"]
+                },
+                cancellationToken);
 
-        return results;
+            if (response.Messages is null || response.Messages.Count == 0)
+            {
+                success = true;
+                return [];
+            }
+
+            var results = new List<SqsReceivedMessage>(response.Messages.Count);
+            foreach (var message in response.Messages)
+            {
+                try
+                {
+                    var envelope = JsonSerializer.Deserialize<MessageEnvelope>(
+                        message.Body,
+                        MessagingJson.Options)
+                        ?? throw new InvalidOperationException("SQS body deserialized to null envelope.");
+
+                    var receiveCount = 1;
+                    if (message.Attributes.TryGetValue("ApproximateReceiveCount", out var raw)
+                        && int.TryParse(raw, out var parsed))
+                    {
+                        receiveCount = parsed;
+                    }
+
+                    results.Add(new SqsReceivedMessage
+                    {
+                        Envelope = envelope,
+                        ReceiptHandle = message.ReceiptHandle,
+                        QueueUrl = queueUrl,
+                        ApproximateReceiveCount = receiveCount
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to deserialize SQS message; leaving for retry/DLQ");
+                }
+            }
+
+            success = true;
+            return results;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            throw;
+        }
+        finally
+        {
+            MessagingTelemetry.RecordOperation("sqs", "receive", destination, sw.Elapsed.TotalSeconds, success);
+        }
     }
 
     public Task DeleteAsync(SqsReceivedMessage message, CancellationToken cancellationToken = default) =>

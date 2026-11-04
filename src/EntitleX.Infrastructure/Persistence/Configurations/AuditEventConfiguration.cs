@@ -51,5 +51,9 @@ public sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEven
         builder.HasIndex(x => x.RequestId);
         builder.HasIndex(x => x.EventType);
         builder.HasIndex(x => x.OccurredAtUtc);
+
+        // Keyset pagination: (request_id, occurred_at_utc, id)
+        builder.HasIndex(x => new { x.RequestId, x.OccurredAtUtc, x.Id })
+            .HasDatabaseName("ix_audit_events_request_occurred_id");
     }
 }

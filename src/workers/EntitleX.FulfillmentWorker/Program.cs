@@ -1,3 +1,4 @@
+using EntitleX.BuildingBlocks.Observability;
 using EntitleX.FulfillmentWorker;
 using EntitleX.Infrastructure;
 using Serilog;
@@ -10,12 +11,11 @@ try
 {
     var builder = Host.CreateApplicationBuilder(args);
 
-    builder.Services.AddSerilog((_, configuration) => configuration
-        .ReadFrom.Configuration(builder.Configuration)
-        .Enrich.FromLogContext()
-        .Enrich.WithProperty("Service", "EntitleX.FulfillmentWorker")
-        .WriteTo.Console());
-
+    builder.Services.AddEntitleXSerilog(builder.Configuration, "EntitleX.FulfillmentWorker");
+    builder.Services.AddEntitleXOpenTelemetry(
+        builder.Configuration,
+        "EntitleX.FulfillmentWorker",
+        isAspNetCoreHost: false);
     builder.Services.AddInfrastructureForWorkers(builder.Configuration);
     builder.Services.AddScoped<FulfillmentCommandProcessor>();
     builder.Services.AddHostedService<FulfillmentSqsWorker>();

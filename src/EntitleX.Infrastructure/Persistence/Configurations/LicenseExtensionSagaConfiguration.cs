@@ -41,6 +41,10 @@ public sealed class LicenseExtensionSagaConfiguration : IEntityTypeConfiguration
         builder.HasIndex(x => x.State)
             .HasDatabaseName("ix_license_extension_sagas_state");
 
+        // Reconciliation backlog / ops scans order by UpdatedAtUtc within state.
+        builder.HasIndex(x => new { x.State, x.UpdatedAtUtc })
+            .HasDatabaseName("ix_license_extension_sagas_state_updated");
+
         builder.Property(x => x.ApprovalBand)
             .HasColumnName("approval_band")
             .HasConversion<string>()

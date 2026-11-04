@@ -18,20 +18,42 @@ public sealed class GetRequestAuditQueryHandler
         GetRequestAuditQuery query,
         CancellationToken cancellationToken)
     {
-        var events = await _audit.ListByRequestAsync(
-            RequestId.From(query.RequestId),
-            cancellationToken);
+        var requestId = RequestId.From(query.RequestId);
+        IReadOnlyList<AuditEventRecord> events;
 
-        return new RequestAuditPageDto(
-            query.RequestId,
-            events.Select(e => new AuditEventDto(
-                e.Id,
-                e.EventType,
-                e.RequestId?.Value,
-                e.LogicalOperationId?.Value,
-                e.Actor,
-                e.Detail,
-                e.CorrelationId,
-                e.OccurredAtUtc)).ToList());
+        if (query.Take is not null)
+        {
+            events = await _audit.ListByRequestKeysetAsync(
+                requestId,
+                query.Take.Value,
+                query.AfterOccurredAtUtc,
+                query.AfterId,
+                cancellationToken);
+        }
+        else
+        {
+            events = await _audit.ListByRequestAsync(requestId, cancellationToken);
+        }
+
+        var dtos = events.Select(e => new AuditEventDto(
+            e.Id,
+            e.EventType,
+            e.RequestId?.Value,
+            e.LogicalOperationId?.Value,
+            e.Actor,
+            e.Detail,
+            e.CorrelationId,
+            e.OccurredAtUtc)).ToList();
+
+        DateTimeOffset? nextOccurred = null;
+        Guid? nextId = null;
+        if (query.Take is not null && dtos.Count == query.Take.Value && dtos.Count > 0)
+        {
+            var last = dtos[^1];
+            nextOccurred = last.OccurredAtUtc;
+            nextId = last.Id;
+        }
+
+        return new RequestAuditPageDto(query.RequestId, dtos, nextOccurred, nextId);
     }
 }

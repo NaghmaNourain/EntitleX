@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\EntitleX.BuildingBlocks\EntitleX.BuildingBlocks.csproj" />
     <ProjectReference Include="..\..\EntitleX.Infrastructure\EntitleX.Infrastructure.csproj" />
     <ProjectReference Include="..\..\EntitleX.Messaging\EntitleX.Messaging.csproj" />
   </ItemGroup>

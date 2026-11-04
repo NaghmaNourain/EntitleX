@@ -35,7 +35,11 @@ public sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outbox
         builder.Property(x => x.SchemaVersion).HasColumnName("schema_version").HasMaxLength(32).IsRequired();
 
         builder.HasIndex(x => x.MessageId).IsUnique();
+        // Claim hot path: FOR UPDATE SKIP LOCKED on (status, available_at_utc).
+        // Tradeoff: favors publisher throughput; poison/published scans use PK/status filters.
         builder.HasIndex(x => new { x.Status, x.AvailableAtUtc })
             .HasDatabaseName("ix_outbox_messages_status_available");
+        builder.HasIndex(x => new { x.Status, x.LockedUntilUtc })
+            .HasDatabaseName("ix_outbox_messages_status_locked");
     }
 }

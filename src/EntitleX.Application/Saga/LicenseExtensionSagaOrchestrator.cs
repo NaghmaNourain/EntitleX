@@ -1,5 +1,6 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.BuildingBlocks.Ids;
+using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Common;
 using EntitleX.Domain.LicenseExtension;
@@ -36,6 +37,7 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
+        using var activity = SagaTelemetry.StartTransition("start");
         var existing = await _sagaRepository.GetByRequestIdAsync(request.Id, cancellationToken);
         if (existing is not null)
         {
@@ -44,6 +46,7 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
 
         var saga = LicenseExtensionSaga.Start(request.Id, band, correlationId: correlationId);
         await _sagaRepository.AddAsync(saga, cancellationToken);
+        SagaTelemetry.RecordTransition("None", saga.State.ToString());
         return saga;
     }
 
@@ -54,7 +57,9 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
+        using var activity = SagaTelemetry.StartTransition("approval_decision");
         var saga = await RequireSagaAsync(request.Id, cancellationToken);
+        var from = saga.State.ToString();
 
         if (decision.Outcome == ApprovalDecisionOutcome.Rejected)
         {
@@ -62,6 +67,7 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
                 decision.ActorUserId,
                 correlationId,
                 reason: decision.Comment ?? "Rejected by approver");
+            SagaTelemetry.RecordTransition(from, saga.State.ToString());
             return;
         }
 
@@ -77,6 +83,8 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         {
             throw new DomainException($"Unhandled approval stage role '{decision.StageRole}'.");
         }
+
+        SagaTelemetry.RecordTransition(from, saga.State.ToString());
 
         if (approvalCase.Status == ApprovalCaseStatus.Approved && saga.State == SagaState.Approved)
         {
@@ -103,7 +111,9 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         Guid? causationId = null,
         CancellationToken cancellationToken = default)
     {
+        using var activity = SagaTelemetry.StartTransition("dispatch_fulfillment");
         var saga = await RequireSagaAsync(request.Id, cancellationToken);
+        var from = saga.State.ToString();
 
         if (request.Status != LicenseExtensionRequestStatus.Approved)
         {
@@ -131,6 +141,7 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         saga.QueueFulfillment(
             items,
             correlationId?.ToString("D"));
+        SagaTelemetry.RecordTransition(from, saga.State.ToString());
     }
 
     public async Task OnFulfillmentDispatchedAsync(
@@ -138,6 +149,7 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
+        using var activity = SagaTelemetry.StartTransition("fulfillment_dispatched");
         var saga = await _sagaRepository.GetByRequestIdAsync(requestId, cancellationToken);
         if (saga is null)
         {
@@ -145,9 +157,11 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
             return;
         }
 
+        var from = saga.State.ToString();
         if (saga.State == SagaState.QueuedForFulfillment)
         {
             saga.MarkProcessing(correlationId);
+            SagaTelemetry.RecordTransition(from, saga.State.ToString());
         }
         else if (saga.State == SagaState.Processing)
         {
@@ -168,8 +182,15 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
+        using var activity = SagaTelemetry.StartTransition("item_completed");
         var saga = await RequireSagaAsync(requestId, cancellationToken);
+        var from = saga.State.ToString();
         saga.RecordItemSucceeded(logicalOperationId, correlationId);
+        if (from != saga.State.ToString())
+        {
+            SagaTelemetry.RecordTransition(from, saga.State.ToString());
+        }
+
         await SyncRequestFulfillmentAsync(requestId, saga, cancellationToken);
     }
 
@@ -181,8 +202,15 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
+        using var activity = SagaTelemetry.StartTransition("item_failed");
         var saga = await RequireSagaAsync(requestId, cancellationToken);
+        var from = saga.State.ToString();
         saga.RecordItemFailed(logicalOperationId, errorCode, errorMessage, correlationId);
+        if (from != saga.State.ToString())
+        {
+            SagaTelemetry.RecordTransition(from, saga.State.ToString());
+        }
+
         await SyncRequestFulfillmentAsync(requestId, saga, cancellationToken);
     }
 
@@ -247,6 +275,14 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         try
         {
             request.CompleteFulfillment(saga.SucceededItemCount, saga.FailedItemCount);
+            var outcome = saga.State switch
+            {
+                SagaState.Completed => "success",
+                SagaState.PartiallyCompleted => "partial",
+                SagaState.Failed => "failed",
+                _ => "other"
+            };
+            SagaTelemetry.RecordFulfillmentOutcome(outcome);
         }
         catch (DomainException ex)
         {

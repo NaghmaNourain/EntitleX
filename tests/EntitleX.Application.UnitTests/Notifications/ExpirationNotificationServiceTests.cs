@@ -224,6 +224,14 @@ public sealed class ExpirationNotificationServiceTests
             RequestId requestId,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<AuditEventRecord>>([]);
+
+        public Task<IReadOnlyList<AuditEventRecord>> ListByRequestKeysetAsync(
+            RequestId requestId,
+            int take,
+            DateTimeOffset? afterOccurredAtUtc,
+            Guid? afterId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<AuditEventRecord>>([]);
     }
 
     private sealed class FakeUnitOfWork : IUnitOfWork

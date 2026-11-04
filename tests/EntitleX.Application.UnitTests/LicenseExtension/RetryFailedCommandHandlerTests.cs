@@ -321,6 +321,11 @@ public sealed class RetryFailedCommandHandlerTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult(_byRequest.TryGetValue(requestId.Value, out var s) ? s : null);
 
+        public Task<LicenseExtensionSaga?> GetByRequestIdReadOnlyAsync(
+            RequestId requestId,
+            CancellationToken cancellationToken = default) =>
+            GetByRequestIdAsync(requestId, cancellationToken);
+
         public Task<LicenseExtensionSaga?> GetByIdAsync(
             Guid id,
             CancellationToken cancellationToken = default) =>

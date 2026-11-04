@@ -2,6 +2,7 @@ using EntitleX.Application.Abstractions;
 using EntitleX.Application.Common.Exceptions;
 using EntitleX.Application.LicenseExtension.Models;
 using EntitleX.BuildingBlocks.Ids;
+using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Identity;
 using EntitleX.Domain.LicenseExtension;
@@ -137,6 +138,10 @@ public sealed class RetryFailedLicenseExtensionsCommandHandler
         {
             return await ResolveClaimConflictAsync(command, sourceId, cancellationToken);
         }
+
+        EntitleXMeters.RetryAttempts.Add(
+            failedItems.Count,
+            new KeyValuePair<string, object?>("source", "selective_retry"));
 
         source.RecordSelectiveRetrySpawned(retry, requestedBy, notes);
         retry.Submit();

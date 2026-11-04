@@ -17,7 +17,7 @@ public sealed class GetSagaQueryHandler : IRequestHandler<GetSagaQuery, SagaDto>
 
     public async Task<SagaDto> Handle(GetSagaQuery query, CancellationToken cancellationToken)
     {
-        var saga = await _sagaRepository.GetByRequestIdAsync(
+        var saga = await _sagaRepository.GetByRequestIdReadOnlyAsync(
             RequestId.From(query.RequestId),
             cancellationToken)
             ?? throw new NotFoundException(
