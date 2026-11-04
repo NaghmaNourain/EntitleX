@@ -1,0 +1,73 @@
+name: Deploy AWS (manual)
+
+# Optional gated deploy. Requires repository Environment "aws-lab" (or similar)
+# with required reviewers and OIDC role secrets. Does NOT run on push.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment name (protection rules / secrets)
+        required: true
+        default: aws-lab
+      apply:
+        description: Run terraform apply (false = plan only)
+        required: true
+        type: boolean
+        default: false
+      enable_ecs_services:
+        description: Pass -var enable_ecs_services
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    name: Terraform plan/apply
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform plan
+        run: |
+          terraform plan \
+            -var="environment=${{ inputs.environment }}" \
+            -var="enable_ecs_services=${{ inputs.enable_ecs_services }}" \
+            -out=tfplan
+
+      - name: Terraform apply
+        if: ${{ inputs.apply }}
+        run: terraform apply -auto-approve tfplan
+
+  # Image push is intentionally separate / optional — wire ECR login when ready.
+  note:
+    name: Deploy notes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reminder
+        run: |
+          echo "Populate Secrets Manager JWT + connection strings outside Terraform."
+          echo "Push images via CI then set container_image_* vars before enable_ecs_services=true."
+          echo "See infra/terraform/COST.md and docs/deployment.md."

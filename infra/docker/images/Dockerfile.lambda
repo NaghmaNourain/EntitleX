@@ -1,0 +1,18 @@
+# syntax=docker/dockerfile:1.7
+# Publishes a .NET Lambda-compatible package (also runnable as console host locally).
+ARG PROJECT_PATH=src/lambdas/EntitleX.ApprovalReminder/EntitleX.ApprovalReminder.csproj
+ARG DLL_NAME=EntitleX.ApprovalReminder.dll
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG PROJECT_PATH
+WORKDIR /src
+COPY Directory.Build.props global.json EntitleX.sln ./
+COPY src/ ./src/
+RUN dotnet restore "${PROJECT_PATH}" \
+ && dotnet publish "${PROJECT_PATH}" -c Release -o /app/publish --no-restore
+
+FROM public.ecr.aws/lambda/dotnet:8 AS final
+ARG DLL_NAME
+WORKDIR /var/task
+COPY --from=build /app/publish .
+# Handler is set via Terraform/Lambda config; default CMD for container image
+CMD ["EntitleX.ApprovalReminder::EntitleX.ApprovalReminder.Function::FunctionHandler"]

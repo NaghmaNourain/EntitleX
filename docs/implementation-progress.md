@@ -527,6 +527,58 @@
 
 ---
 
-## Remaining (roadmap only — not started)
+## Phase 12 — Terraform, CI, documentation pack (final)
 
-12. Terraform/CI/docs pack.
+**Status:** Complete on branch `cursor/phase-12-delivery-bc4f` (based on Phase 11 / PR #11)
+
+### Verified
+
+| Item | Result |
+|------|--------|
+| `dotnet build EntitleX.sln` | Succeeds (0 warnings, 0 errors) |
+| Domain / Application / Infrastructure / CloudShield unit tests | Passed |
+| E2E offline invariant tests (`EntitleX.E2E.Tests`) | Passed (live 1000-item harness intentionally skipped) |
+| Docs pack | Present under `docs/` + root README reproduce workflow |
+| Terraform modules | Present under `infra/terraform/` (fmt-checked in CI) |
+| Dockerfiles | Present under `infra/docker/images/` |
+| CI workflows | Build/unit/integration/E2E + static analysis + Docker image builds; optional `deploy-aws.yml` |
+
+### Delivered in Phase 12
+
+**Terraform (optional AWS, cost-documented)**
+
+- Modules: VPC, ECS Fargate, RDS PostgreSQL, SQS (+DLQ), SNS/SES, Lambda, EventBridge, CloudWatch, IAM, Secrets Manager, S3 audit exports
+- Credentials never hardcoded — Secrets Manager + task roles; see `infra/terraform/COST.md` + `README.md`
+- Defaults keep spend low (`enable_ecs_services=false`, single-AZ `db.t4g.micro`)
+
+**GitHub Actions**
+
+- `.github/workflows/ci.yml` — restore, build, unit tests, integration tests (DockerFact skip), E2E scaffolding tests, static analysis (`dotnet format` soft gate + analyzers + `terraform fmt`), Docker image builds (API, worker, simulator, frontend)
+- `.github/workflows/deploy-aws.yml` — `workflow_dispatch` only, OIDC, plan/apply gated by GitHub Environment
+
+**Documentation pack (Mermaid diagrams)**
+
+- `README.md` end-to-end reproduce workflow
+- `docs/architecture.md`, `system-design.md`, `database-schema.md`, `api-contracts.md`
+- Updated: `event-contracts.md`, `saga-workflow.md`, `idempotency.md`, `reconciliation.md`, `failure-scenarios.md`
+- New: `deployment.md`, `interview-guide.md`, `docs/diagrams/README.md`
+- Diagrams: system architecture, request sequence, approval workflow, saga state machine, ER, retry lineage, outbox, reconciliation, failure recovery
+
+**E2E scaffolding**
+
+- `tests/EntitleX.E2E.Tests` — 1000 / 970 / 30 / retry lineage scenario documented + offline invariants
+- Live harness skipped until `ENTITLEX_E2E=1` + Compose wiring (see scenario markdown)
+
+### Unverified in this environment
+
+| Item | Reason |
+|------|--------|
+| `terraform apply` against a real AWS account | Optional / cost-bearing; not applied |
+| Docker image builds on this agent | Docker engine not available locally (CI job covers it) |
+| Live 1000-item E2E against Compose | No Docker; harness scaffolded + documented |
+| SES / EventBridge invoke in AWS | Terraform + stubs only |
+| Managed Kafka/MSK | Intentionally out of Terraform; Compose Kafka for local |
+
+### Explicitly out of scope (Phase 12)
+
+- None remaining on the original 12-phase roadmap — **final planned phase complete**
