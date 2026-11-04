@@ -45,7 +45,7 @@ try
         {
             Title = "EntitleX API",
             Version = "v1",
-            Description = "Enterprise license-extension control plane (Phase 5 — outbox / SQS / Kafka fulfillment)."
+            Description = "Enterprise license-extension control plane (Phase 6 — durable saga / forward recovery)."
         });
 
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -108,6 +108,7 @@ try
     app.MapLicenseExtensionEndpoints();
     app.MapEntitlementAggregationEndpoints();
     app.MapApprovalEndpoints();
+    app.MapSagaEndpoints();
 
     var jwtOptions = app.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
     if (app.Environment.IsDevelopment() && jwtOptions.EnableDevTokenEndpoint)

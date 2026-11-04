@@ -1,3 +1,4 @@
+using EntitleX.Application;
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Infrastructure.Identity;
@@ -37,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EntitleXDbContext>());
         services.AddScoped<ILicenseExtensionRequestRepository, LicenseExtensionRequestRepository>();
         services.AddScoped<IApprovalCaseRepository, ApprovalCaseRepository>();
+        services.AddScoped<ILicenseExtensionSagaRepository, LicenseExtensionSagaRepository>();
         services.AddScoped<IOutboxWriter, OutboxWriter>();
         services.AddScoped<OutboxClaimer>();
         services.AddScoped<OutboxPublisherService>();
@@ -82,11 +84,13 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EntitleXDbContext>());
         services.AddScoped<ILicenseExtensionRequestRepository, LicenseExtensionRequestRepository>();
+        services.AddScoped<ILicenseExtensionSagaRepository, LicenseExtensionSagaRepository>();
         services.AddScoped<IOutboxWriter, OutboxWriter>();
         services.AddScoped<OutboxClaimer>();
         services.AddScoped<OutboxPublisherService>();
         services.AddScoped<IConsumerIdempotencyStore, EfConsumerIdempotencyStore>();
         services.AddScoped<ProviderResultProcessor>();
+        services.AddSagaOrchestration();
         services.AddEntitleXMessaging(configuration);
         return services;
     }

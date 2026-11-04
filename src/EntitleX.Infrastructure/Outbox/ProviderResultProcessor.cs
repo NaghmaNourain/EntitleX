@@ -1,5 +1,5 @@
+using EntitleX.Application.Abstractions;
 using EntitleX.BuildingBlocks.Ids;
-using EntitleX.Domain.LicenseExtension;
 using EntitleX.Infrastructure.Persistence;
 using EntitleX.Messaging.Contracts;
 using Microsoft.EntityFrameworkCore;
@@ -9,19 +9,24 @@ using Npgsql;
 namespace EntitleX.Infrastructure.Outbox;
 
 /// <summary>
-/// Idempotently records provider completion/failure events and advances request
-/// status when all items have reported (pre-saga ledger).
+/// Idempotently records provider completion/failure events and advances the
+/// durable saga (which aggregates request status via forward recovery).
 /// </summary>
 public sealed class ProviderResultProcessor
 {
     public const string ConsumerName = "entitlex-provider-results";
 
     private readonly EntitleXDbContext _db;
+    private readonly ILicenseExtensionSagaOrchestrator _sagaOrchestrator;
     private readonly ILogger<ProviderResultProcessor> _logger;
 
-    public ProviderResultProcessor(EntitleXDbContext db, ILogger<ProviderResultProcessor> logger)
+    public ProviderResultProcessor(
+        EntitleXDbContext db,
+        ILicenseExtensionSagaOrchestrator sagaOrchestrator,
+        ILogger<ProviderResultProcessor> logger)
     {
         _db = db;
+        _sagaOrchestrator = sagaOrchestrator;
         _logger = logger;
     }
 
@@ -49,7 +54,18 @@ public sealed class ProviderResultProcessor
                 DateTimeOffset.UtcNow),
             cancellationToken);
 
-        await TryCompleteRequestAsync(payload.RequestId, cancellationToken);
+        await _sagaOrchestrator.OnItemCompletedAsync(
+            RequestId.From(payload.RequestId),
+            LogicalOperationId.From(payload.LogicalOperationId),
+            envelope.CorrelationId?.ToString("D"),
+            cancellationToken);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Recorded success for request {RequestId} logicalOp={LogicalOperationId}",
+            payload.RequestId,
+            payload.LogicalOperationId);
     }
 
     public async Task ProcessFailedAsync(
@@ -76,7 +92,20 @@ public sealed class ProviderResultProcessor
                 DateTimeOffset.UtcNow),
             cancellationToken);
 
-        await TryCompleteRequestAsync(payload.RequestId, cancellationToken);
+        await _sagaOrchestrator.OnItemFailedAsync(
+            RequestId.From(payload.RequestId),
+            LogicalOperationId.From(payload.LogicalOperationId),
+            payload.ErrorCode,
+            payload.ErrorMessage,
+            envelope.CorrelationId?.ToString("D"),
+            cancellationToken);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Recorded failure for request {RequestId} logicalOp={LogicalOperationId}",
+            payload.RequestId,
+            payload.LogicalOperationId);
     }
 
     private async Task<bool> TryClaimAsync(
@@ -122,51 +151,6 @@ public sealed class ProviderResultProcessor
         })
         {
             _db.ChangeTracker.Clear();
-        }
-    }
-
-    private async Task TryCompleteRequestAsync(Guid requestId, CancellationToken cancellationToken)
-    {
-        var request = await _db.LicenseExtensionRequests
-            .Include(r => r.Items)
-            .FirstOrDefaultAsync(r => r.Id == RequestId.From(requestId), cancellationToken);
-
-        if (request is null)
-        {
-            _logger.LogWarning("Provider result for unknown request {RequestId}", requestId);
-            return;
-        }
-
-        var results = await _db.FulfillmentItemResults
-            .Where(r => r.RequestId == requestId)
-            .ToListAsync(cancellationToken);
-
-        if (results.Count < request.Items.Count)
-        {
-            return;
-        }
-
-        var succeeded = results.Count(r => r.Succeeded);
-        var failed = results.Count - succeeded;
-
-        try
-        {
-            request.CompleteFulfillment(succeeded, failed);
-            await _db.SaveChangesAsync(cancellationToken);
-            _logger.LogInformation(
-                "Request {RequestId} fulfillment settled succeeded={Succeeded} failed={Failed} status={Status}",
-                requestId,
-                succeeded,
-                failed,
-                request.Status);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "Could not settle fulfillment for request {RequestId} (status={Status})",
-                requestId,
-                request.Status);
         }
     }
 }

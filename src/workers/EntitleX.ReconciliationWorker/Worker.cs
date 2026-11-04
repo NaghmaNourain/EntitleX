@@ -1,17 +1,44 @@
+using EntitleX.Application.Abstractions;
+
 namespace EntitleX.ReconciliationWorker;
 
 /// <summary>
-/// Phase 1 heartbeat stub. License reconciliation arrives in a later phase.
+/// Phase 6 wires saga timeout-hook scanning. Full provider reconciliation
+/// repair arrives in Phase 8.
 /// </summary>
-public sealed class Worker(ILogger<Worker> logger) : BackgroundService
+public sealed class Worker(
+    IServiceScopeFactory scopeFactory,
+    ILogger<Worker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("ReconciliationWorker started (heartbeat stub)");
+        logger.LogInformation(
+            "ReconciliationWorker started (Phase 6: saga timeout hooks; Phase 8: full repair TBD)");
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            logger.LogDebug("ReconciliationWorker heartbeat at {Timestamp:u}", DateTimeOffset.UtcNow);
+            try
+            {
+                using var scope = scopeFactory.CreateScope();
+                var orchestrator = scope.ServiceProvider
+                    .GetRequiredService<ILicenseExtensionSagaOrchestrator>();
+                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+                await orchestrator.ApplyElapsedTimeoutsAsync(
+                    DateTimeOffset.UtcNow,
+                    take: 50,
+                    stoppingToken);
+                await unitOfWork.SaveChangesAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Saga timeout-hook scan failed");
+            }
+
             await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
         }
     }

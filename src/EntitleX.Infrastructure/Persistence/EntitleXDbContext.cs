@@ -1,6 +1,7 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
+using EntitleX.Domain.Saga;
 using EntitleX.Infrastructure.Outbox;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +21,12 @@ public sealed class EntitleXDbContext : DbContext, IUnitOfWork
     public DbSet<ApprovalStage> ApprovalStages => Set<ApprovalStage>();
 
     public DbSet<ApprovalDecision> ApprovalDecisions => Set<ApprovalDecision>();
+
+    public DbSet<LicenseExtensionSaga> LicenseExtensionSagas => Set<LicenseExtensionSaga>();
+
+    public DbSet<SagaTransition> SagaTransitions => Set<SagaTransition>();
+
+    public DbSet<SagaItemOutcome> SagaItemOutcomes => Set<SagaItemOutcome>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
