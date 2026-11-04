@@ -38,3 +38,26 @@ jobs:
         run: |
           dotnet test tests/EntitleX.Infrastructure.IntegrationTests/EntitleX.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
           dotnet test tests/CloudShield.Infrastructure.IntegrationTests/CloudShield.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build

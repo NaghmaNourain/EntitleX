@@ -354,7 +354,7 @@
 
 ---
 
-## Phase 9 — Approval reminder + expiration Lambdas (current)
+## Phase 9 — Approval reminder + expiration Lambdas
 
 **Status:** Complete on branch `cursor/phase-9-lambdas-bc4f` (based on Phase 8)
 
@@ -407,6 +407,68 @@
 
 ---
 
+## Phase 10 — React frontend (current)
+
+**Status:** Complete on branch `cursor/phase-10-frontend-bc4f` (based on Phase 9)
+
+### Verified
+
+| Item | Result |
+|------|--------|
+| Frontend `npm run build` | Succeeds (`tsc -b` + Vite production bundle) |
+| `dotnet build EntitleX.sln` | Succeeds (0 warnings, 0 errors) |
+| Domain / Application unit tests | **66 + 25 passed** |
+| Stack | React 19 + TypeScript + Vite + TanStack Query + React Router + MUI |
+
+### Delivered in Phase 10
+
+**Pages (15)**
+
+1. Login (dev JWT via `POST /api/v1/dev/tokens`)
+2. Dashboard
+3. Customer entitlement search (pagination + provider filter + bulk select)
+4. Unified entitlement details
+5. Create extension request
+6. Bulk entitlement selection
+7. Extension request details (+ approval summary)
+8. Renewal Manager approval queue
+9. Deal Desk approval queue
+10. Fulfillment progress (saga poll)
+11. Failed entitlement details
+12. Retry Failed Extensions (explicit **will retry** vs **untouched successes**)
+13. Request lineage / retry history
+14. Audit history
+15. Operational monitoring dashboard
+
+**Frontend quality**
+
+- Typed API client with Bearer JWT, `X-Correlation-ID`, `Idempotency-Key`
+- Loading / validation / ProblemDetails errors / pagination / filtering
+- Role-gated nav + route guards; keyboard-focusable controls; `aria-*` on busy/error regions
+- Vite proxy: `/api` + `/health` → `http://localhost:5080`
+
+**Thin BFF reads added for UI (existing stores/repos)**
+
+- `GET /api/v1/approvals/pending?role=&take=&skip=`
+- `GET /api/v1/audit/requests/{requestId}`
+- `GET /api/v1/admin/ops/summary`
+- Dev CORS for `localhost:5173`
+
+### Unverified in this environment
+
+| Item | Reason |
+|------|--------|
+| Live UI ↔ API against Compose Postgres/simulators | No Docker; API not run end-to-end in this agent |
+| Visual a11y audit / screen-reader pass | Manual tooling not run |
+| Production JWT / CORS hardening | Dev-oriented wiring only |
+
+### Explicitly out of scope (Phase 10)
+
+- Observability dashboards / perf (Phase 11)
+- Terraform / CI pack / docs polish (Phase 12)
+
+---
+
 ## Remaining (roadmap only — not started)
 
-10. React UI · 11. Observability/perf · 12. Terraform/CI/docs pack.
+11. Observability/perf · 12. Terraform/CI/docs pack.
