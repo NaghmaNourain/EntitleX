@@ -37,9 +37,44 @@ public sealed class EfAuditEventStore : IAuditEventStore
             .AsNoTracking()
             .Where(e => e.RequestId == requestId)
             .OrderBy(e => e.OccurredAtUtc)
+            .ThenBy(e => e.Id)
             .ToListAsync(cancellationToken);
 
-        return rows.Select(e => new AuditEventRecord(
+        return rows.Select(Map).ToList();
+    }
+
+    public async Task<IReadOnlyList<AuditEventRecord>> ListByRequestKeysetAsync(
+        RequestId requestId,
+        int take,
+        DateTimeOffset? afterOccurredAtUtc,
+        Guid? afterId,
+        CancellationToken cancellationToken = default)
+    {
+        take = Math.Clamp(take, 1, 500);
+        var query = _db.AuditEvents
+            .AsNoTracking()
+            .Where(e => e.RequestId == requestId);
+
+        if (afterOccurredAtUtc is not null && afterId is not null)
+        {
+            var cursorTime = afterOccurredAtUtc.Value;
+            var cursorId = afterId.Value;
+            query = query.Where(e =>
+                e.OccurredAtUtc > cursorTime
+                || (e.OccurredAtUtc == cursorTime && e.Id.CompareTo(cursorId) > 0)); // EF translates Guid CompareTo for Npgsql
+        }
+
+        var rows = await query
+            .OrderBy(e => e.OccurredAtUtc)
+            .ThenBy(e => e.Id)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(Map).ToList();
+    }
+
+    private static AuditEventRecord Map(AuditEvent e) =>
+        new(
             e.Id,
             e.EventType,
             e.RequestId,
@@ -47,6 +82,5 @@ public sealed class EfAuditEventStore : IAuditEventStore
             e.Actor,
             e.Detail,
             e.CorrelationId,
-            e.OccurredAtUtc)).ToList();
-    }
+            e.OccurredAtUtc);
 }

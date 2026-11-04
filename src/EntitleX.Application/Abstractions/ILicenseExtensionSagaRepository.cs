@@ -11,6 +11,11 @@ public interface ILicenseExtensionSagaRepository
         RequestId requestId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Read-only saga load (AsNoTracking) for GET APIs — avoid N+1 and change-tracker cost.</summary>
+    Task<LicenseExtensionSaga?> GetByRequestIdReadOnlyAsync(
+        RequestId requestId,
+        CancellationToken cancellationToken = default);
+
     Task<LicenseExtensionSaga?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default);

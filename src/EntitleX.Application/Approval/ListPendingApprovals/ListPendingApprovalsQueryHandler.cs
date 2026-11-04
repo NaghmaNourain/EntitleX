@@ -22,6 +22,7 @@ public sealed class ListPendingApprovalsQueryHandler
         var skip = Math.Max(0, query.Skip);
 
         // Fetch a bounded pending set, then filter/page in memory (pending queues are small).
+        // Prefer keyset (AfterCreatedAtUtc + AfterApprovalCaseId) over Skip for stable paging.
         var pending = await _approvals.ListPendingAsync(500, cancellationToken);
 
         IEnumerable<ApprovalCase> filtered = pending;
@@ -39,10 +40,27 @@ public sealed class ListPendingApprovalsQueryHandler
             });
         }
 
-        var materialized = filtered.ToList();
-        var page = materialized
-            .Skip(skip)
-            .Take(take)
+        var ordered = filtered
+            .OrderBy(c => c.CreatedAtUtc)
+            .ThenBy(c => c.Id)
+            .ToList();
+
+        IEnumerable<ApprovalCase> pageSource = ordered;
+        if (query.AfterCreatedAtUtc is not null && query.AfterApprovalCaseId is not null)
+        {
+            var cursorTime = query.AfterCreatedAtUtc.Value;
+            var cursorId = query.AfterApprovalCaseId.Value;
+            pageSource = ordered.Where(c =>
+                c.CreatedAtUtc > cursorTime
+                || (c.CreatedAtUtc == cursorTime && c.Id.CompareTo(cursorId) > 0));
+        }
+        else if (skip > 0)
+        {
+            pageSource = ordered.Skip(skip);
+        }
+
+        var pageCases = pageSource.Take(take).ToList();
+        var page = pageCases
             .Select(c => new PendingApprovalSummaryDto(
                 c.Id,
                 c.RequestId.Value,
@@ -56,6 +74,15 @@ public sealed class ListPendingApprovalsQueryHandler
                 c.CreatedAtUtc))
             .ToList();
 
-        return new PendingApprovalsPageDto(materialized.Count, skip, take, page);
+        DateTimeOffset? nextCreated = null;
+        Guid? nextId = null;
+        if (pageCases.Count == take && pageCases.Count > 0)
+        {
+            var last = pageCases[^1];
+            nextCreated = last.CreatedAtUtc;
+            nextId = last.Id;
+        }
+
+        return new PendingApprovalsPageDto(ordered.Count, skip, take, page, nextCreated, nextId);
     }
 }

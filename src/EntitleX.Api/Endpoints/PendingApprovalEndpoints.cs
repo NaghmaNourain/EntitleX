@@ -26,6 +26,8 @@ public static class PendingApprovalEndpoints
         [FromQuery] string? role,
         [FromQuery] int take,
         [FromQuery] int skip,
+        [FromQuery] DateTimeOffset? afterCreatedAtUtc,
+        [FromQuery] Guid? afterApprovalCaseId,
         ISender sender,
         CancellationToken cancellationToken)
     {
@@ -33,7 +35,9 @@ public static class PendingApprovalEndpoints
             new ListPendingApprovalsQuery(
                 role,
                 take <= 0 ? 50 : take,
-                skip < 0 ? 0 : skip),
+                skip < 0 ? 0 : skip,
+                afterCreatedAtUtc,
+                afterApprovalCaseId),
             cancellationToken);
         return Results.Ok(result);
     }

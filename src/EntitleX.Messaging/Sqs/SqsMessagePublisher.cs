@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Amazon;
 using Amazon.Runtime;
@@ -5,6 +6,7 @@ using Amazon.SQS;
 using Amazon.SQS.Model;
 using EntitleX.Messaging.Abstractions;
 using EntitleX.Messaging.Contracts;
+using EntitleX.Messaging.Metrics;
 using EntitleX.Messaging.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -40,32 +42,69 @@ public sealed class SqsMessagePublisher : ISqsMessagePublisher, IAsyncDisposable
         MessageEnvelope envelope,
         CancellationToken cancellationToken = default)
     {
-        var queueUrl = await ResolveQueueUrlAsync(queueName, cancellationToken);
-        var body = JsonSerializer.Serialize(envelope, MessagingJson.Options);
+        using var activity = MessagingTelemetry.StartProduce("sqs", queueName);
+        var sw = Stopwatch.StartNew();
+        var success = false;
 
-        await _client.SendMessageAsync(
-            new SendMessageRequest
+        try
+        {
+            var queueUrl = await ResolveQueueUrlAsync(queueName, cancellationToken);
+            var body = JsonSerializer.Serialize(envelope, MessagingJson.Options);
+
+            // W3C trace context as SQS message attributes (low-cardinality keys only).
+            var attributes = new Dictionary<string, MessageAttributeValue>
             {
-                QueueUrl = queueUrl,
-                MessageBody = body,
-                MessageAttributes = new Dictionary<string, MessageAttributeValue>
+                ["MessageType"] = new() { DataType = "String", StringValue = envelope.MessageType },
+                ["SchemaVersion"] = new() { DataType = "String", StringValue = envelope.SchemaVersion },
+                ["MessageId"] = new()
                 {
-                    ["MessageType"] = new() { DataType = "String", StringValue = envelope.MessageType },
-                    ["SchemaVersion"] = new() { DataType = "String", StringValue = envelope.SchemaVersion },
-                    ["MessageId"] = new()
+                    DataType = "String",
+                    StringValue = envelope.MessageId.ToString("D")
+                }
+            };
+
+            if (Activity.Current is { } current)
+            {
+                attributes["traceparent"] = new()
+                {
+                    DataType = "String",
+                    StringValue = current.Id ?? string.Empty
+                };
+                if (!string.IsNullOrEmpty(current.TraceStateString))
+                {
+                    attributes["tracestate"] = new()
                     {
                         DataType = "String",
-                        StringValue = envelope.MessageId.ToString("D")
-                    }
+                        StringValue = current.TraceStateString
+                    };
                 }
-            },
-            cancellationToken);
+            }
 
-        _logger.LogDebug(
-            "Published SQS message {MessageId} type {MessageType} to {Queue}",
-            envelope.MessageId,
-            envelope.MessageType,
-            queueName);
+            await _client.SendMessageAsync(
+                new SendMessageRequest
+                {
+                    QueueUrl = queueUrl,
+                    MessageBody = body,
+                    MessageAttributes = attributes
+                },
+                cancellationToken);
+
+            success = true;
+            _logger.LogDebug(
+                "Published SQS message {MessageId} type {MessageType} to {Queue}",
+                envelope.MessageId,
+                envelope.MessageType,
+                queueName);
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            throw;
+        }
+        finally
+        {
+            MessagingTelemetry.RecordOperation("sqs", "publish", queueName, sw.Elapsed.TotalSeconds, success);
+        }
     }
 
     public async Task<string> ResolveQueueUrlAsync(

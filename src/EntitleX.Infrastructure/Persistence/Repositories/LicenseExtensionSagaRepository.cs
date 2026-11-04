@@ -27,6 +27,15 @@ public sealed class LicenseExtensionSagaRepository : ILicenseExtensionSagaReposi
             .Include(x => x.ItemOutcomes)
             .SingleOrDefaultAsync(x => x.RequestId == requestId, cancellationToken);
 
+    public Task<LicenseExtensionSaga?> GetByRequestIdReadOnlyAsync(
+        RequestId requestId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.LicenseExtensionSagas
+            .AsNoTracking()
+            .Include(x => x.Transitions)
+            .Include(x => x.ItemOutcomes)
+            .SingleOrDefaultAsync(x => x.RequestId == requestId, cancellationToken);
+
     public Task<LicenseExtensionSaga?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default) =>

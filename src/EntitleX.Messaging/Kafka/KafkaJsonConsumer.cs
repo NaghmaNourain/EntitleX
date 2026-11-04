@@ -1,6 +1,9 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Confluent.Kafka;
+using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Messaging.Contracts;
+using EntitleX.Messaging.Metrics;
 using EntitleX.Messaging.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -49,20 +52,31 @@ public sealed class KafkaJsonConsumer : IDisposable
     public KafkaConsumedMessage? Consume(TimeSpan timeout, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var destination = "subscribed-topics";
+        using var activity = MessagingTelemetry.StartConsume("kafka", destination);
+        var sw = Stopwatch.StartNew();
+        var success = false;
 
         try
         {
             var result = _consumer.Consume(timeout);
             if (result?.Message?.Value is null)
             {
+                success = true;
                 return null;
             }
+
+            destination = result.Topic;
+            activity?.SetTag("messaging.destination", destination);
+
+            RefreshLagHook(result);
 
             var envelope = JsonSerializer.Deserialize<MessageEnvelope>(
                 result.Message.Value,
                 MessagingJson.Options)
                 ?? throw new InvalidOperationException("Kafka payload deserialized to null envelope.");
 
+            success = true;
             return new KafkaConsumedMessage
             {
                 Envelope = envelope,
@@ -73,8 +87,35 @@ public sealed class KafkaJsonConsumer : IDisposable
         }
         catch (ConsumeException ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Error.Reason);
             _logger.LogError(ex, "Kafka consume error: {Reason}", ex.Error.Reason);
             throw;
+        }
+        finally
+        {
+            MessagingTelemetry.RecordOperation(
+                "kafka",
+                "consume",
+                destination,
+                sw.Elapsed.TotalSeconds,
+                success);
+        }
+    }
+
+    private void RefreshLagHook(ConsumeResult<string, string> result)
+    {
+        try
+        {
+            var watermark = _consumer.GetWatermarkOffsets(result.TopicPartition);
+            if (watermark.High.Value >= 0 && result.Offset.Value >= 0)
+            {
+                var lag = Math.Max(0, watermark.High.Value - (result.Offset.Value + 1));
+                EntitleXMeters.KafkaConsumerLagHook = lag;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Kafka lag hook refresh failed");
         }
     }
 

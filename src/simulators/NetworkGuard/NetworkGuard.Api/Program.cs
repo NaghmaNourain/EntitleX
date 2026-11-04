@@ -1,3 +1,4 @@
+using EntitleX.BuildingBlocks.Observability;
 using Microsoft.EntityFrameworkCore;
 using NetworkGuard.Api.Endpoints;
 using NetworkGuard.Application;
@@ -19,8 +20,11 @@ try
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
         .Enrich.WithProperty("Service", "NetworkGuard.Api")
+        .Enrich.WithEnvironmentName()
+        .Enrich.WithMachineName()
         .WriteTo.Console());
 
+    builder.Services.AddEntitleXOpenTelemetry(builder.Configuration, "NetworkGuard.Api", isAspNetCoreHost: true);
     builder.Services.AddNetworkGuardApplication();
     builder.Services.AddNetworkGuardInfrastructure(builder.Configuration);
 
@@ -47,6 +51,7 @@ try
     }));
 
     app.MapHealthChecks("/health/ready");
+    app.MapEntitleXPrometheusScrapingEndpoint();
     app.MapNetworkGuardLicenseEndpoints();
 
     if (ShouldMigrateOnStartup(app.Configuration))

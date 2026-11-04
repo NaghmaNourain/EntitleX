@@ -19,6 +19,16 @@ public interface IAuditEventStore
     Task<IReadOnlyList<AuditEventRecord>> ListByRequestAsync(
         RequestId requestId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Keyset page over audit events for a request (OccurredAtUtc, Id). Prefer over Skip/Take.
+    /// </summary>
+    Task<IReadOnlyList<AuditEventRecord>> ListByRequestKeysetAsync(
+        RequestId requestId,
+        int take,
+        DateTimeOffset? afterOccurredAtUtc,
+        Guid? afterId,
+        CancellationToken cancellationToken = default);
 }
 
 public static class AuditEventTypes

@@ -15,10 +15,11 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         services.Configure<MessagingOptions>(configuration.GetSection(MessagingOptions.SectionName));
-        services.AddSingleton<IOutboxMetrics, LoggingOutboxMetrics>();
+        services.AddSingleton<IOutboxMetrics, OpenTelemetryOutboxMetrics>();
         services.AddSingleton<SqsMessagePublisher>();
         services.AddSingleton<ISqsMessagePublisher>(sp => sp.GetRequiredService<SqsMessagePublisher>());
         services.AddSingleton<SqsFulfillmentConsumer>();
+        services.AddSingleton<SqsDepthProbe>();
         services.AddSingleton<KafkaMessagePublisher>();
         services.AddSingleton<IKafkaMessagePublisher>(sp => sp.GetRequiredService<KafkaMessagePublisher>());
         return services;

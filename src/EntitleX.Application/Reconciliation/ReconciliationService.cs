@@ -1,6 +1,7 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Reconciliation.Models;
 using EntitleX.BuildingBlocks.Ids;
+using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;
 using Microsoft.Extensions.Logging;
@@ -49,6 +50,7 @@ public sealed class ReconciliationService : IReconciliationService
         string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
+        using var activity = ReconciliationTelemetry.StartPass("batch");
         await _sagaOrchestrator.ApplyElapsedTimeoutsAsync(
             DateTimeOffset.UtcNow,
             take,
@@ -58,6 +60,7 @@ public sealed class ReconciliationService : IReconciliationService
         var candidates = await _sagaRepository.ListRequiringReconciliationAsync(
             take,
             cancellationToken);
+        ReconciliationTelemetry.SetBacklog(candidates.Count);
 
         var results = new List<ReconciliationRunResult>(candidates.Count);
         foreach (var saga in candidates)
@@ -78,6 +81,7 @@ public sealed class ReconciliationService : IReconciliationService
         string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
+        using var activity = ReconciliationTelemetry.StartPass("request");
         var saga = await _sagaRepository.GetByRequestIdAsync(requestId, cancellationToken)
             ?? throw new InvalidOperationException(
                 $"No saga found for request '{requestId.Value}'.");
@@ -152,6 +156,11 @@ public sealed class ReconciliationService : IReconciliationService
                 DateTimeOffset.UtcNow),
             cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        foreach (var item in itemResults)
+        {
+            ReconciliationTelemetry.RecordAction(item.Action.ToString());
+        }
 
         return new ReconciliationRunResult(
             requestId.Value,

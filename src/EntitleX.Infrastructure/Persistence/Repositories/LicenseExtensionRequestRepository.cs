@@ -16,7 +16,18 @@ public sealed class LicenseExtensionRequestRepository : ILicenseExtensionRequest
 
     public async Task AddAsync(LicenseExtensionRequest request, CancellationToken cancellationToken = default)
     {
-        await _dbContext.LicenseExtensionRequests.AddAsync(request, cancellationToken);
+        // Up to MaxItems (1000): disable auto-detect during graph attach, then rely on
+        // Npgsql MaxBatchSize for batched INSERTs (see DependencyInjection / docs/performance.md).
+        var autoDetect = _dbContext.ChangeTracker.AutoDetectChangesEnabled;
+        try
+        {
+            _dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
+            await _dbContext.LicenseExtensionRequests.AddAsync(request, cancellationToken);
+        }
+        finally
+        {
+            _dbContext.ChangeTracker.AutoDetectChangesEnabled = autoDetect;
+        }
     }
 
     public async Task<LicenseExtensionRequest?> GetByIdAsync(
@@ -33,7 +44,9 @@ public sealed class LicenseExtensionRequestRepository : ILicenseExtensionRequest
         string extensionNumber,
         CancellationToken cancellationToken = default)
     {
+        // Existence check — no tracking, no Includes (avoid N+1 / tracker noise).
         return _dbContext.LicenseExtensionRequests
+            .AsNoTracking()
             .AnyAsync(x => x.ExtensionNumber == extensionNumber, cancellationToken);
     }
 }

@@ -31,10 +31,15 @@ public static class DependencyInjection
 
         services.AddDbContext<EntitleXDbContext>(options =>
         {
+            // Npgsql pools connections by default (Max Pool Size=100). Tune via connection string
+            // (Minimum Pool Size / Maximum Pool Size / Timeout) — see docs/performance.md.
             options.UseNpgsql(connectionString, npgsql =>
             {
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "public");
                 npgsql.MigrationsAssembly(typeof(EntitleXDbContext).Assembly.FullName);
+                // Batch up to 100 commands per round-trip (helps 1000-item request inserts).
+                npgsql.MaxBatchSize(100);
+                npgsql.CommandTimeout(60);
             });
         });
 
@@ -54,6 +59,8 @@ public static class DependencyInjection
         services.AddScoped<ProviderResultProcessor>();
 
         services.AddEntitleXMessaging(configuration);
+        services.AddHostedService<Observability.BacklogMetricsProbe>();
+        services.AddHostedService<Observability.SqsDepthProbeHostedService>();
 
         services.AddProviderHttpClients(configuration);
 
@@ -90,6 +97,8 @@ public static class DependencyInjection
             {
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "public");
                 npgsql.MigrationsAssembly(typeof(EntitleXDbContext).Assembly.FullName);
+                npgsql.MaxBatchSize(100);
+                npgsql.CommandTimeout(60);
             });
         });
 
@@ -110,6 +119,8 @@ public static class DependencyInjection
         services.AddTransient<IProviderOperationStatusClient, NetworkGuardOperationStatusClient>();
         services.AddSagaOrchestration();
         services.AddEntitleXMessaging(configuration);
+        services.AddHostedService<Observability.BacklogMetricsProbe>();
+        services.AddHostedService<Observability.SqsDepthProbeHostedService>();
         return services;
     }
 
@@ -131,6 +142,8 @@ public static class DependencyInjection
             {
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "public");
                 npgsql.MigrationsAssembly(typeof(EntitleXDbContext).Assembly.FullName);
+                npgsql.MaxBatchSize(100);
+                npgsql.CommandTimeout(60);
             });
         });
 
