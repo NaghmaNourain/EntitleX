@@ -2,6 +2,8 @@
 
 Phase 6 introduces a **durable centralized saga** (`LicenseExtensionSaga`) that orchestrates approval ordering, fulfillment dispatch, item outcomes, and request-status aggregation for each `LicenseExtensionRequest`.
 
+Source of truth: `src/EntitleX.Domain/Saga/LicenseExtensionSaga.cs` (`AllowedTransitions`, `SagaState`, `SagaTimeoutKind`).
+
 ## Why forward recovery (not compensation)
 
 License extensions **grant additional entitlement time**. Once a provider has successfully extended an entitlement:
@@ -36,6 +38,63 @@ There is **no** compensating transaction that undoes a successful provider exten
 | `Escalated` | Approval (or other) timeout / manual escalation |
 | `Rejected` | Policy unsupported or human rejection |
 
+### AllowedTransitions (state machine)
+
+```mermaid
+stateDiagram-v2
+  [*] --> Requested
+
+  Requested --> PendingRenewalManagerApproval
+  Requested --> Approved
+  Requested --> Rejected
+  Requested --> Escalated
+
+  PendingRenewalManagerApproval --> PendingDealDeskApproval
+  PendingRenewalManagerApproval --> Approved
+  PendingRenewalManagerApproval --> Rejected
+  PendingRenewalManagerApproval --> Escalated
+
+  PendingDealDeskApproval --> Approved
+  PendingDealDeskApproval --> Rejected
+  PendingDealDeskApproval --> Escalated
+
+  Approved --> QueuedForFulfillment
+
+  QueuedForFulfillment --> Processing
+  QueuedForFulfillment --> ReconciliationRequired
+  QueuedForFulfillment --> Escalated
+
+  Processing --> PartiallyCompleted
+  Processing --> Completed
+  Processing --> Failed
+  Processing --> ReconciliationRequired
+
+  PartiallyCompleted --> Completed
+  PartiallyCompleted --> Failed
+  PartiallyCompleted --> ReconciliationRequired
+  PartiallyCompleted --> Processing
+
+  ReconciliationRequired --> Processing
+  ReconciliationRequired --> PartiallyCompleted
+  ReconciliationRequired --> Completed
+  ReconciliationRequired --> Failed
+  ReconciliationRequired --> Escalated
+
+  Escalated --> PendingRenewalManagerApproval
+  Escalated --> PendingDealDeskApproval
+  Escalated --> Approved
+  Escalated --> Rejected
+  Escalated --> QueuedForFulfillment
+  Escalated --> Processing
+  Escalated --> ReconciliationRequired
+
+  Completed --> [*]
+  Failed --> [*]
+  Rejected --> [*]
+```
+
+Terminal states (`Completed`, `Failed`, `Rejected`) have empty transition sets.
+
 ### Mapping `InFulfillment` (Phase 5 request status)
 
 The request aggregate already uses **`InFulfillment`** after outbox enqueue. That name is **retained** on `LicenseExtensionRequestStatus`.
@@ -62,7 +121,7 @@ Full projection table (`SagaRequestStatusMap`):
 | `Failed` | `Failed` |
 | `Rejected` | `Rejected` |
 
-\* `ReconciliationRequired` projects to `PartiallyFulfilled` when at least one success exists; otherwise the request may remain `InFulfillment` until Phase 8 clarifies outcomes.
+\* `ReconciliationRequired` projects to `PartiallyFulfilled` when at least one success exists; otherwise the request may remain `InFulfillment` until reconciliation clarifies outcomes.
 
 ## Approval ordering
 
@@ -82,6 +141,16 @@ Approved
   → RecordItemSucceeded / RecordItemFailed (results consumer)
   → AggregateStatus → Completed | PartiallyCompleted | Failed
 ```
+
+### Domain methods driving transitions
+
+- `Start` → `RouteInitialBand` (AutoApprove / RM / RM+DD / Unsupported→Rejected)
+- `RecordRenewalManagerApproval` / `RecordDealDeskApproval` / `RecordRejection`
+- `QueueFulfillment` (seeds `SagaItemOutcome` Pending rows keyed by `LogicalOperationId`)
+- `MarkProcessing`
+- `RecordItemSucceeded` / `RecordItemFailed` → `AggregateStatus` (forward recovery → Partial/Completed/Failed)
+- `CorrectItemSucceededFromReconciliation` / `KeepItemUncertainFromReconciliation`
+- `MarkReconciliationRequired`, `Escalate` / `ApplyConfiguredTerminalState`, `ApplyTimeout`, `ResumeFromEscalation`
 
 ## Transition history
 

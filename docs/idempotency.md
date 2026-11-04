@@ -24,7 +24,33 @@ Returns `201 Created` with the new request DTO (`Location` →
 **Lost-response replay:** the same `Idempotency-Key` for the same source returns
 the **prior** retry request (same id). No second claim, no second outbox write.
 
-## What gets copied
+## Retry lineage (ParentId / AttemptId / LogicalOperationId)
+
+```mermaid
+flowchart TB
+  subgraph Original["Original request"]
+    R0[LicenseExtensionRequest id=R0]
+    I0[Item LogicalOperationId=L1 AttemptId=A1]
+    R0 --> I0
+  end
+
+  subgraph Retry1["Selective retry 1"]
+    R1[Request id=R1 ParentId=R0]
+    I1[Item LogicalOperationId=L1 AttemptId=A2]
+    R1 --> I1
+  end
+
+  subgraph Retry2["Selective retry 2"]
+    R2[Request id=R2 ParentId=R1]
+    I2[Item LogicalOperationId=L1 AttemptId=A3]
+    R2 --> I2
+  end
+
+  R0 -->|"retry-failed + Idempotency-Key"| R1
+  R1 -->|"retry of a retry"| R2
+  I0 -.->|"same LogicalOperationId"| I1
+  I1 -.->|"same LogicalOperationId"| I2
+```
 
 | Field | Behavior |
 |---|---|
@@ -37,6 +63,8 @@ the **prior** retry request (same id). No second claim, no second outbox write.
 | History | Source `retry_history` + retry `notes` |
 
 Succeeded siblings are **never** copied (forward recovery).
+
+`LogicalOperationId` type: `EntitleX.BuildingBlocks.Ids.LogicalOperationId` (readonly record struct over `Guid`). Unique indexes: saga outcomes, fulfillment results, provider `applied_license_operations`.
 
 ## Reconcile-uncertain gate (Phase 8)
 
@@ -63,6 +91,8 @@ case, saga seed, and fulfillment **outbox** row:
 open across Kafka, SQS, or outbound HTTP. Async fulfillment is dispatched by
 writing the transactional outbox; workers publish after commit.
 
+Store: `EfRetryClaimStore` (`IRetryClaimStore`) — `FindByIdempotencyKeyAsync`, `TryClaimItemsAsync`. Handler: `RetryFailedLicenseExtensionsCommandHandler`.
+
 ### Concurrency matrix
 
 | Scenario | Outcome |
@@ -71,6 +101,13 @@ writing the transactional outbox; workers publish after commit.
 | Same key, concurrent | One insert wins; loser re-reads idempotency record |
 | Different keys, same failed items | One claim wins; other → `409 Conflict` |
 | Multi-generation (retry of a retry) | Claims are scoped to the **immediate** source request id |
+
+## Consumer / provider layers
+
+| Mechanism | Table / type | Behavior |
+|---|---|---|
+| Consumer at-least-once | `processed_messages` | PK `(consumer_name, idempotency_key)` |
+| Provider apply | unique `logical_operation_id` on `AppliedLicenseOperation` | Already-applied returns success without re-extend |
 
 ## AuthZ
 
@@ -81,4 +118,5 @@ handler also re-checks those roles so MediatR callers cannot bypass the policy.
 
 - `docs/saga-workflow.md` — forward recovery and item outcomes
 - `docs/event-contracts.md` — fulfillment / provider envelopes
+- `docs/reconciliation.md` — gate before retry
 - EF migration `SelectiveRetryIdempotency`
