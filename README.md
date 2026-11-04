@@ -16,8 +16,8 @@ Phase 6 adds the durable centralized saga (forward recovery). See [docs/implemen
 - **Transactional outbox** → SQS fulfillment → Kafka provider commands (partition key = entitlement id) → simulator results → saga settlement
 - **Vendor simulators** with own PostgreSQL databases and `AppliedLicenseOperation` claim semantics
 - **Notification emails** via Mailpit (SMTP) or LocalStack SES — app links only, no email approve buttons
-- **Workers**: OutboxPublisher, FulfillmentWorker (SQS + results), reconciliation/notification stubs
-- **Lambda stubs** for scheduled approval reminders and expiration notifications
+- **Workers**: OutboxPublisher, FulfillmentWorker (SQS + results), ReconciliationWorker, NotificationService probe
+- **Scheduled Lambdas** (local host runners + EventBridge stubs): approval reminders and expiration notifications — see [docs/lambdas.md](docs/lambdas.md)
 - Decision record: [docs/adr/0001-modular-api-vs-microservices.md](docs/adr/0001-modular-api-vs-microservices.md)
 
 ## Prerequisites
@@ -49,6 +49,14 @@ dotnet run --project src/workers/EntitleX.FulfillmentWorker
 
 # Optional: notification probe worker (same Email:* config)
 dotnet run --project src/workers/EntitleX.NotificationService
+
+# Optional: reconciliation worker (timeouts + provider repair)
+dotnet run --project src/workers/EntitleX.ReconciliationWorker
+
+# Phase 9 scheduled jobs (run-once local hosts; EventBridge stubs in docs/lambdas.md)
+dotnet run --project src/lambdas/EntitleX.ApprovalReminder
+dotnet run --project src/lambdas/EntitleX.ExpirationNotification -- --provider CloudShield
+dotnet run --project src/lambdas/EntitleX.ExpirationNotification -- --provider NetworkGuard
 
 # Tests
 dotnet test tests/EntitleX.Domain.UnitTests

@@ -12,4 +12,9 @@ public interface IApprovalCaseRepository
         CancellationToken cancellationToken = default);
 
     Task<ApprovalCase?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>Pending approval cases (for scheduled reminder scans).</summary>
+    Task<IReadOnlyList<ApprovalCase>> ListPendingAsync(
+        int take,
+        CancellationToken cancellationToken = default);
 }

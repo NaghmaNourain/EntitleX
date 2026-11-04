@@ -590,6 +590,108 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_events", "public");
                 });
 
+            modelBuilder.Entity("EntitleX.Infrastructure.Notifications.ApprovalReminderRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApprovalCaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval_case_id");
+
+                    b.Property<DateTimeOffset?>("EscalatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("escalated_at_utc");
+
+                    b.Property<DateTimeOffset>("ReminderSentAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reminder_sent_at_utc");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<int>("StageOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage_order");
+
+                    b.Property<string>("TerminalStateApplied")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("terminal_state_applied");
+
+                    b.Property<string>("WindowKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("window_key");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WindowKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_approval_reminder_records_window_key");
+
+                    b.HasIndex("ApprovalCaseId", "StageOrder")
+                        .IsUnique()
+                        .HasDatabaseName("ux_approval_reminder_records_case_stage");
+
+                    b.ToTable("approval_reminder_records", "public");
+                });
+
+            modelBuilder.Entity("EntitleX.Infrastructure.Notifications.ExpirationNotificationRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CustomerId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("EntitlementId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("entitlement_id");
+
+                    b.Property<DateTimeOffset>("ExpiryUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expiry_utc");
+
+                    b.Property<DateTimeOffset>("NotifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("notified_at_utc");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("WindowKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("window_key");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WindowKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_expiration_notification_records_window_key");
+
+                    b.HasIndex("Provider", "EntitlementId")
+                        .HasDatabaseName("ix_expiration_notification_records_provider_entitlement");
+
+                    b.ToTable("expiration_notification_records", "public");
+                });
+
             modelBuilder.Entity("EntitleX.Infrastructure.Outbox.FulfillmentItemResult", b =>
                 {
                     b.Property<Guid>("Id")

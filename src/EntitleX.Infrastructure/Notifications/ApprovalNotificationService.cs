@@ -1,5 +1,6 @@
 using System.Net;
 using EntitleX.Application.Abstractions;
+using EntitleX.Application.EntitlementAggregation.Models;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Identity;
 using EntitleX.Domain.LicenseExtension;
@@ -97,6 +98,60 @@ public sealed class ApprovalNotificationService : IApprovalNotificationService
             subject,
             body,
             link,
+            cancellationToken);
+    }
+
+    public Task NotifyApprovalReminderAsync(
+        LicenseExtensionRequest request,
+        ApprovalCase approvalCase,
+        ApprovalStage stage,
+        TimeSpan pendingFor,
+        CancellationToken cancellationToken = default)
+    {
+        var role = ApprovalRules.RoleName(stage.RequiredRole);
+        var link = BuildRequestLink(request.Id.Value);
+        var days = Math.Max(1, (int)Math.Ceiling(pendingFor.TotalDays));
+        var subject = $"EntitleX approval reminder — {request.ExtensionNumber}";
+        var body =
+            $"Reminder: extension {request.ExtensionNumber} has been awaiting your approval for {days} day(s).{Environment.NewLine}" +
+            $"Stage: {stage.Order} ({role}){Environment.NewLine}" +
+            $"Band: {approvalCase.Band}{Environment.NewLine}" +
+            $"Max extension days: {approvalCase.MaxExtensionDays}{Environment.NewLine}{Environment.NewLine}" +
+            $"Open the request in EntitleX to approve or reject:{Environment.NewLine}{link}{Environment.NewLine}{Environment.NewLine}" +
+            "Do not reply to this email to approve — decisions are recorded only in the application." +
+            Environment.NewLine;
+
+        return SendSafeAsync(
+            ResolveMailbox(role),
+            role,
+            subject,
+            body,
+            link,
+            cancellationToken);
+    }
+
+    public Task NotifyExpirationWarningAsync(
+        NormalizedEntitlementDto entitlement,
+        string portalLink,
+        CancellationToken cancellationToken = default)
+    {
+        var subject =
+            $"EntitleX license expiring — {entitlement.CustomerId} / {entitlement.ProductCode}";
+        var body =
+            $"A {entitlement.Provider} entitlement is approaching expiry.{Environment.NewLine}" +
+            $"Customer: {entitlement.CustomerId}{Environment.NewLine}" +
+            $"Product: {entitlement.ProductCode} ({entitlement.DisplayName}){Environment.NewLine}" +
+            $"Product group: {entitlement.ProductGroup ?? "(none)"}{Environment.NewLine}" +
+            $"Entitlement ref: {entitlement.EntitlementId}{Environment.NewLine}" +
+            $"Expires (UTC): {entitlement.ExpiryUtc:u}{Environment.NewLine}{Environment.NewLine}" +
+            $"Open in EntitleX portal:{Environment.NewLine}{portalLink}{Environment.NewLine}";
+
+        return SendSafeAsync(
+            ResolveMailbox(EntitleXRoles.RenewalRepresentative),
+            "Renewal Representative",
+            subject,
+            body,
+            portalLink,
             cancellationToken);
     }
 
