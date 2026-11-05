@@ -1,5 +1,6 @@
 using EntitleX.Application.LicenseExtension.CreateLicenseExtensionRequest;
 using EntitleX.Application.LicenseExtension.GetLicenseExtensionRequest;
+using EntitleX.Infrastructure.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,6 +16,7 @@ public static class LicenseExtensionEndpoints
         group.MapPost("/", CreateAsync)
             .WithName("CreateLicenseExtensionRequest")
             .WithOpenApi()
+            .RequireAuthorization(AuthorizationPolicies.CanCreateRequests)
             .Produces(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status409Conflict);
@@ -22,6 +24,7 @@ public static class LicenseExtensionEndpoints
         group.MapGet("/{id:guid}", GetByIdAsync)
             .WithName("GetLicenseExtensionRequest")
             .WithOpenApi()
+            .RequireAuthorization()
             .Produces(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status404NotFound);
 

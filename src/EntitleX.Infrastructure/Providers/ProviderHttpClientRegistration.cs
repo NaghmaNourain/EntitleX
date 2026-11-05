@@ -1,7 +1,9 @@
+using EntitleX.BuildingBlocks.Observability;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
+using Polly.CircuitBreaker;
 using Polly.Timeout;
 
 namespace EntitleX.Infrastructure.Providers;
@@ -22,26 +24,30 @@ internal static class ProviderHttpClientRegistration
             services,
             ProviderHttpClientNames.CloudShield,
             options.CloudShield,
-            "cloudshield-get");
+            "cloudshield-get",
+            "CloudShield");
 
         AddIdempotentGetClient(
             services,
             ProviderHttpClientNames.NetworkGuard,
             options.NetworkGuard,
-            "networkguard-get");
+            "networkguard-get",
+            "NetworkGuard");
 
         // Command clients intentionally omit retry — POSTs are not blindly retried.
         AddCommandClient(
             services,
             ProviderHttpClientNames.CloudShieldCommands,
             options.CloudShield,
-            "cloudshield-commands");
+            "cloudshield-commands",
+            "CloudShield");
 
         AddCommandClient(
             services,
             ProviderHttpClientNames.NetworkGuardCommands,
             options.NetworkGuard,
-            "networkguard-commands");
+            "networkguard-commands",
+            "NetworkGuard");
 
         return services;
     }
@@ -50,7 +56,8 @@ internal static class ProviderHttpClientRegistration
         IServiceCollection services,
         string name,
         ProviderEndpointOptions endpoint,
-        string pipelineName)
+        string pipelineName,
+        string providerLabel)
     {
         services.AddHttpClient(name, client =>
             {
@@ -58,6 +65,7 @@ internal static class ProviderHttpClientRegistration
                 client.Timeout = Timeout.InfiniteTimeSpan; // Polly owns timeouts
             })
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddHttpMessageHandler(() => new ProviderLatencyDelegatingHandler(providerLabel))
             .AddResilienceHandler(pipelineName, builder =>
             {
                 builder.AddTimeout(new TimeoutStrategyOptions
@@ -86,7 +94,7 @@ internal static class ProviderHttpClientRegistration
                     }
                 });
 
-                builder.AddCircuitBreaker(CreateCircuitBreakerOptions(endpoint));
+                builder.AddCircuitBreaker(CreateCircuitBreakerOptions(endpoint, providerLabel));
                 builder.AddConcurrencyLimiter(
                     endpoint.BulkheadMaxParallelization,
                     endpoint.BulkheadQueueLimit);
@@ -97,7 +105,8 @@ internal static class ProviderHttpClientRegistration
         IServiceCollection services,
         string name,
         ProviderEndpointOptions endpoint,
-        string pipelineName)
+        string pipelineName,
+        string providerLabel)
     {
         services.AddHttpClient(name, client =>
             {
@@ -105,6 +114,7 @@ internal static class ProviderHttpClientRegistration
                 client.Timeout = Timeout.InfiniteTimeSpan;
             })
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddHttpMessageHandler(() => new ProviderLatencyDelegatingHandler(providerLabel))
             .AddResilienceHandler(pipelineName, builder =>
             {
                 builder.AddTimeout(new TimeoutStrategyOptions
@@ -113,7 +123,7 @@ internal static class ProviderHttpClientRegistration
                 });
 
                 // No retry strategy — non-idempotent POSTs must not be blindly retried.
-                builder.AddCircuitBreaker(CreateCircuitBreakerOptions(endpoint));
+                builder.AddCircuitBreaker(CreateCircuitBreakerOptions(endpoint, providerLabel));
                 builder.AddConcurrencyLimiter(
                     endpoint.BulkheadMaxParallelization,
                     endpoint.BulkheadQueueLimit);
@@ -121,7 +131,8 @@ internal static class ProviderHttpClientRegistration
     }
 
     private static HttpCircuitBreakerStrategyOptions CreateCircuitBreakerOptions(
-        ProviderEndpointOptions endpoint) =>
+        ProviderEndpointOptions endpoint,
+        string providerLabel) =>
         new()
         {
             SamplingDuration = endpoint.CircuitBreakerSamplingDuration,
@@ -131,8 +142,29 @@ internal static class ProviderHttpClientRegistration
             ShouldHandle = args =>
                 HttpClientResiliencePredicates.IsTransient(args.Outcome)
                     ? PredicateResult.True()
-                    : PredicateResult.False()
+                    : PredicateResult.False(),
+            OnOpened = _ =>
+            {
+                RecordCircuitTransition(providerLabel, "opened");
+                return ValueTask.CompletedTask;
+            },
+            OnClosed = _ =>
+            {
+                RecordCircuitTransition(providerLabel, "closed");
+                return ValueTask.CompletedTask;
+            },
+            OnHalfOpened = _ =>
+            {
+                RecordCircuitTransition(providerLabel, "half_opened");
+                return ValueTask.CompletedTask;
+            }
         };
+
+    private static void RecordCircuitTransition(string provider, string state) =>
+        EntitleXMeters.CircuitBreakerTransitions.Add(
+            1,
+            new KeyValuePair<string, object?>("provider", provider),
+            new KeyValuePair<string, object?>("state", state));
 
     private static string EnsureTrailingSlash(string baseUrl)
     {

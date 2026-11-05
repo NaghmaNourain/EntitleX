@@ -9,10 +9,14 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\EntitleX.Application\EntitleX.Application.csproj" />
+    <ProjectReference Include="..\..\EntitleX.BuildingBlocks\EntitleX.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\EntitleX.Infrastructure\EntitleX.Infrastructure.csproj" />
     <ProjectReference Include="..\..\EntitleX.Messaging\EntitleX.Messaging.csproj" />
   </ItemGroup>
 </Project>

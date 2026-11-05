@@ -13,11 +13,13 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
+    <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\EntitleX.Application\EntitleX.Application.csproj" />
+    <ProjectReference Include="..\EntitleX.BuildingBlocks\EntitleX.BuildingBlocks.csproj" />
     <ProjectReference Include="..\EntitleX.Infrastructure\EntitleX.Infrastructure.csproj" />
   </ItemGroup>
 

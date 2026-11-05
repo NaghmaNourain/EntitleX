@@ -1,6 +1,8 @@
 using CloudShield.Application.Abstractions;
+using CloudShield.Infrastructure.Messaging;
 using CloudShield.Infrastructure.Persistence;
 using CloudShield.Infrastructure.Persistence.Repositories;
+using EntitleX.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +32,12 @@ public static class DependencyInjection
         services.AddScoped<ICloudShieldEntitlementRepository, CloudShieldEntitlementRepository>();
         services.AddScoped<IAppliedLicenseOperationRepository, AppliedLicenseOperationRepository>();
         services.AddScoped<ILicenseExtensionApplier, LicenseExtensionApplier>();
+
+        if (configuration.GetValue("Messaging:Enabled", defaultValue: true))
+        {
+            services.AddEntitleXMessaging(configuration);
+            services.AddHostedService<ProviderCommandConsumer>();
+        }
 
         return services;
     }

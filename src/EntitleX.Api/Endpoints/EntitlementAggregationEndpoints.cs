@@ -15,6 +15,7 @@ public static class EntitlementAggregationEndpoints
         group.MapGet("/search", SearchAsync)
             .WithName("SearchCustomerEntitlements")
             .WithOpenApi()
+            .RequireAuthorization()
             .Produces(StatusCodes.Status200OK)
             .ProducesValidationProblem();
 

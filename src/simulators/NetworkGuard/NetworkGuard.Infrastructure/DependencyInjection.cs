@@ -1,7 +1,9 @@
+using EntitleX.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NetworkGuard.Application.Abstractions;
+using NetworkGuard.Infrastructure.Messaging;
 using NetworkGuard.Infrastructure.Persistence;
 using NetworkGuard.Infrastructure.Persistence.Repositories;
 
@@ -30,6 +32,12 @@ public static class DependencyInjection
         services.AddScoped<INetworkGuardLicenseRepository, NetworkGuardLicenseRepository>();
         services.AddScoped<IAppliedLicenseOperationRepository, AppliedLicenseOperationRepository>();
         services.AddScoped<ILicenseExtensionApplier, LicenseExtensionApplier>();
+
+        if (configuration.GetValue("Messaging:Enabled", defaultValue: true))
+        {
+            services.AddEntitleXMessaging(configuration);
+            services.AddHostedService<ProviderCommandConsumer>();
+        }
 
         return services;
     }

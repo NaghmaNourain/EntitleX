@@ -1,0 +1,18 @@
+# syntax=docker/dockerfile:1.7
+# Build args: PROJECT_PATH (csproj relative), DLL_NAME
+ARG PROJECT_PATH=src/workers/EntitleX.OutboxPublisher/EntitleX.OutboxPublisher.csproj
+ARG DLL_NAME=EntitleX.OutboxPublisher.dll
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG PROJECT_PATH
+WORKDIR /src
+COPY Directory.Build.props global.json EntitleX.sln ./
+COPY src/ ./src/
+RUN dotnet restore "${PROJECT_PATH}" \
+ && dotnet publish "${PROJECT_PATH}" -c Release -o /app/publish --no-restore
+
+FROM mcr.microsoft.com/dotnet/runtime:8.0 AS final
+ARG DLL_NAME
+WORKDIR /app
+ENV ENTITLEX_ENTRY_DLL=${DLL_NAME}
+COPY --from=build /app/publish .
+ENTRYPOINT ["sh", "-c", "dotnet \"$ENTITLEX_ENTRY_DLL\""]

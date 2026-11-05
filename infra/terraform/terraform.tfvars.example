@@ -1,0 +1,26 @@
+# Copy to terraform.tfvars (gitignored) or pass via -var / CI secrets.
+# NEVER put JWT keys, DB passwords, or AWS access keys in this file or in git.
+
+aws_region  = "us-east-1"
+environment = "lab"
+name_prefix = "entitlex"
+
+enable_nat_gateway = true
+enable_ecs_services = false   # flip true after container images are pushed
+enable_lambda_schedules = false
+
+rds_instance_class       = "db.t4g.micro"
+rds_allocated_storage_gb = 20
+rds_multi_az             = false
+
+ses_from_address = "noreply@example.com"
+app_base_url     = "https://entitlex.example.com"
+
+# After CI publishes images:
+# container_image_api            = "123456789012.dkr.ecr.us-east-1.amazonaws.com/entitlex-api:sha-abc"
+# container_image_outbox         = "..."
+# container_image_fulfillment    = "..."
+# container_image_reconciliation = "..."
+# container_image_notification   = "..."
+# container_image_cloudshield    = "..."
+# container_image_networkguard   = "..."

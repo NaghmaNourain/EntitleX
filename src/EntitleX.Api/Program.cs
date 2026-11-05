@@ -2,11 +2,17 @@ using EntitleX.Api.Endpoints;
 using EntitleX.Api.Infrastructure;
 using EntitleX.Api.Middleware;
 using EntitleX.Application;
+using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Infrastructure;
+using EntitleX.Infrastructure.Identity;
 using EntitleX.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.OpenApi.Models;
 using Serilog;
+using Serilog.Events;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -19,12 +25,24 @@ try
     builder.Host.UseSerilog((context, services, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
+        .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
         .Enrich.FromLogContext()
         .Enrich.WithProperty("Service", "EntitleX.Api")
+        .Enrich.WithEnvironmentName()
+        .Enrich.WithMachineName()
         .WriteTo.Console());
 
+    builder.Services.AddEntitleXOpenTelemetry(builder.Configuration, "EntitleX.Api", isAspNetCoreHost: true);
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
+
+    if (builder.Environment.IsDevelopment())
+    {
+        builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+        {
+            options.RequireHttpsMetadata = false;
+        });
+    }
 
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
@@ -33,17 +51,56 @@ try
         {
             Title = "EntitleX API",
             Version = "v1",
-            Description = "Enterprise license-extension control plane (Phase 3)."
+            Description = "Enterprise license-extension control plane (Phase 11 — OpenTelemetry + metrics)."
+        });
+
+        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+            Name = "Authorization",
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT"
+        });
+
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
+                },
+                Array.Empty<string>()
+            }
         });
     });
 
     builder.Services.AddProblemDetails();
+
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("FrontendDev", policy =>
+            policy.WithOrigins(
+                    "http://localhost:5173",
+                    "http://127.0.0.1:5173")
+                .AllowAnyHeader()
+                .AllowAnyMethod());
+    });
 
     var app = builder.Build();
 
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseSerilogRequestLogging();
     app.UseEntitleXExceptionHandler();
+
+    app.UseCors("FrontendDev");
+    app.UseAuthentication();
+    app.UseAuthorization();
 
     if (app.Environment.IsDevelopment())
     {
@@ -52,20 +109,35 @@ try
     }
 
     app.MapGet("/health", () => Results.Ok(new
-    {
-        status = "Healthy",
-        service = "EntitleX.Api",
-        timestampUtc = DateTimeOffset.UtcNow
-    }));
+        {
+            status = "Healthy",
+            service = "EntitleX.Api",
+            timestampUtc = DateTimeOffset.UtcNow
+        }))
+        .AllowAnonymous();
 
-    app.MapHealthChecks("/health/ready");
+    app.MapHealthChecks("/health/ready").AllowAnonymous();
     app.MapHealthChecks("/health/providers", new HealthCheckOptions
     {
         Predicate = check => check.Tags.Contains("provider")
-    });
+    }).AllowAnonymous();
+    app.MapEntitleXPrometheusScrapingEndpoint();
 
     app.MapLicenseExtensionEndpoints();
+    app.MapLicenseExtensionRetryEndpoints();
     app.MapEntitlementAggregationEndpoints();
+    app.MapApprovalEndpoints();
+    app.MapPendingApprovalEndpoints();
+    app.MapSagaEndpoints();
+    app.MapReconciliationEndpoints();
+    app.MapAuditEndpoints();
+    app.MapOpsEndpoints();
+
+    var jwtOptions = app.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
+    if (app.Environment.IsDevelopment() && jwtOptions.EnableDevTokenEndpoint)
+    {
+        app.MapDevTokenEndpoints();
+    }
 
     if (ShouldMigrateOnStartup(app.Configuration))
     {

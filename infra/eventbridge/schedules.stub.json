@@ -1,0 +1,35 @@
+{
+  "comment": "EventBridge schedule stubs. AWS packaging: infra/terraform/modules/eventbridge + modules/lambda.",
+  "rules": [
+    {
+      "name": "entitlex-approval-reminder",
+      "scheduleExpression": "rate(1 hour)",
+      "description": "Pending approval ≥7d → remind → after 24h apply configured terminal saga state",
+      "target": {
+        "function": "EntitleX.ApprovalReminder",
+        "handler": "HandlerAsync",
+        "input": {}
+      }
+    },
+    {
+      "name": "entitlex-expiration-cloudshield",
+      "scheduleExpression": "rate(24 hours)",
+      "description": "CloudShield near-expiry notifications (configurable warning days)",
+      "target": {
+        "function": "EntitleX.ExpirationNotification",
+        "handler": "HandlerAsync",
+        "input": { "providers": ["CloudShield"] }
+      }
+    },
+    {
+      "name": "entitlex-expiration-networkguard",
+      "scheduleExpression": "rate(7 days)",
+      "description": "NetworkGuard near-expiry notifications (weekly cadence)",
+      "target": {
+        "function": "EntitleX.ExpirationNotification",
+        "handler": "HandlerAsync",
+        "input": { "providers": ["NetworkGuard"] }
+      }
+    }
+  ]
+}
