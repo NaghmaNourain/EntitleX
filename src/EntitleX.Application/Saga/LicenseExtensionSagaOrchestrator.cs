@@ -17,6 +17,13 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
     private readonly ISagaTimeoutHook _timeoutHook;
     private readonly ILogger<LicenseExtensionSagaOrchestrator> _logger;
 
+    /// <summary>
+    /// Saga started in this scoped unit of work but not yet flushed by SaveChanges.
+    /// EF Core database queries omit Added entities; create/auto-approve dispatches
+    /// fulfillment in the same request and must use this instance.
+    /// </summary>
+    private LicenseExtensionSaga? _startedInScope;
+
     public LicenseExtensionSagaOrchestrator(
         ILicenseExtensionSagaRepository sagaRepository,
         ILicenseExtensionRequestRepository requestRepository,
@@ -41,11 +48,14 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         var existing = await _sagaRepository.GetByRequestIdAsync(request.Id, cancellationToken);
         if (existing is not null)
         {
+            _startedInScope = existing;
             return existing;
         }
 
+        // Routes Requested → Approved (auto), Pending* (human), or Rejected (unsupported).
         var saga = LicenseExtensionSaga.Start(request.Id, band, correlationId: correlationId);
         await _sagaRepository.AddAsync(saga, cancellationToken);
+        _startedInScope = saga;
         SagaTelemetry.RecordTransition("None", saga.State.ToString());
         return saga;
     }
@@ -294,6 +304,13 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         RequestId requestId,
         CancellationToken cancellationToken)
     {
+        // Prefer the saga started earlier in this scope — create/auto-approve calls
+        // DispatchFulfillmentAsync before SaveChanges, and EF queries miss Added rows.
+        if (_startedInScope is not null && _startedInScope.RequestId.Equals(requestId))
+        {
+            return _startedInScope;
+        }
+
         return await _sagaRepository.GetByRequestIdAsync(requestId, cancellationToken)
             ?? throw new InvalidOperationException(
                 $"Saga for request '{requestId.Value}' was not found.");

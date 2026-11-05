@@ -155,7 +155,11 @@ public sealed class RetryFailedLicenseExtensionsCommandHandler
         var approvalCase = ApprovalCase.Open(retry.Id, maxDays, band);
         ApplyInitialApprovalTransition(retry, band, reuseApproval);
 
-        await _sagaOrchestrator.StartForRequestAsync(retry, band, command.CorrelationId, cancellationToken);
+        _ = await _sagaOrchestrator.StartForRequestAsync(
+            retry,
+            band,
+            command.CorrelationId,
+            cancellationToken);
 
         if (retry.Status == LicenseExtensionRequestStatus.Approved)
         {
@@ -163,6 +167,7 @@ public sealed class RetryFailedLicenseExtensionsCommandHandler
                 ? parsed
                 : (Guid?)null;
             // Outbox enqueue stays inside the short PG unit of work — no Kafka/SQS/HTTP here.
+            // Orchestrator retains the in-scope saga started above (pre-SaveChanges).
             await _sagaOrchestrator.DispatchFulfillmentAsync(
                 retry,
                 correlation,

@@ -84,7 +84,9 @@ public sealed class StartApprovalCommandHandler
             request.Reject();
         }
 
-        await _sagaOrchestrator.StartForRequestAsync(
+        // Start before dispatch so auto-approve can enqueue fulfillment against the
+        // in-scope saga (not yet SaveChanges'd — see LicenseExtensionSagaOrchestrator).
+        _ = await _sagaOrchestrator.StartForRequestAsync(
             request,
             band,
             command.CorrelationId,

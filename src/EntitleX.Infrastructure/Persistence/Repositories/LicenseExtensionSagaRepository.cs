@@ -19,13 +19,24 @@ public sealed class LicenseExtensionSagaRepository : ILicenseExtensionSagaReposi
         await _dbContext.LicenseExtensionSagas.AddAsync(saga, cancellationToken);
     }
 
-    public Task<LicenseExtensionSaga?> GetByRequestIdAsync(
+    public async Task<LicenseExtensionSaga?> GetByRequestIdAsync(
         RequestId requestId,
-        CancellationToken cancellationToken = default) =>
-        _dbContext.LicenseExtensionSagas
+        CancellationToken cancellationToken = default)
+    {
+        // EF Core SQL queries do not return Added-but-unsaved entities. Create/auto-approve
+        // starts a saga and dispatches fulfillment in the same unit of work before SaveChanges.
+        var local = _dbContext.LicenseExtensionSagas.Local
+            .FirstOrDefault(x => x.RequestId.Equals(requestId));
+        if (local is not null)
+        {
+            return local;
+        }
+
+        return await _dbContext.LicenseExtensionSagas
             .Include(x => x.Transitions)
             .Include(x => x.ItemOutcomes)
             .SingleOrDefaultAsync(x => x.RequestId == requestId, cancellationToken);
+    }
 
     public Task<LicenseExtensionSaga?> GetByRequestIdReadOnlyAsync(
         RequestId requestId,

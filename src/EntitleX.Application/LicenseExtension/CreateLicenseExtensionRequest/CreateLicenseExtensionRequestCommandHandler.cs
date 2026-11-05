@@ -64,7 +64,13 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
 
         ApplyInitialApprovalTransition(aggregate, band);
 
-        await _sagaOrchestrator.StartForRequestAsync(aggregate, band, cancellationToken: cancellationToken);
+        // Must start (and retain) the saga before fulfillment dispatch. Auto-approve
+        // paths enqueue outbox in the same unit of work before SaveChanges; the
+        // orchestrator keeps the in-scope saga so Dispatch does not re-query the DB.
+        _ = await _sagaOrchestrator.StartForRequestAsync(
+            aggregate,
+            band,
+            cancellationToken: cancellationToken);
 
         if (aggregate.Status == LicenseExtensionRequestStatus.Approved)
         {
