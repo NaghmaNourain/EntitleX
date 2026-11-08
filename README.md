@@ -138,6 +138,7 @@ App processes (not in Compose by default): API `:5080`, CloudShield `:5081`, Net
 | [docs/failure-scenarios.md](docs/failure-scenarios.md) | F1–F10 failure catalog |
 | [docs/deployment.md](docs/deployment.md) | Compose vs AWS Terraform, CI/CD, secrets |
 | [docs/interview-guide.md](docs/interview-guide.md) | Senior/Staff interview questions |
+| [docs/guides/README.md](docs/guides/README.md) | Educational guides (collections → security) with EntitleX samples |
 | [docs/diagrams/README.md](docs/diagrams/README.md) | Mermaid diagram index |
 | [docs/lambdas.md](docs/lambdas.md) | ApprovalReminder + ExpirationNotification |
 | [docs/observability.md](docs/observability.md) | OTel, Prometheus, Serilog |
@@ -158,7 +159,7 @@ infra/
   docker/           # Postgres init, Prometheus/Grafana, container Dockerfiles
   eventbridge/      # Schedule stubs
   terraform/        # Optional AWS packaging
-docs/               # Architecture, contracts, interview guide
+docs/               # Architecture, contracts, interview guide, educational guides/
 tests/              # Unit, integration (DockerFact), E2E scaffolding
 ```
 
