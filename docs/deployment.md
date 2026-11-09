@@ -111,3 +111,7 @@ Local hosts: [lambdas.md](lambdas.md).
 ## Cost pointer
 
 Read **[infra/terraform/COST.md](../infra/terraform/COST.md)** before `terraform apply`. Guidance: tear down when idle; keep ECS/Lambda gated off until images and secrets exist; avoid NAT unless required.
+
+## HA / DR
+
+Lab defaults keep `rds_multi_az=false`. For a non-lab checklist see `infra/terraform/terraform.tfvars.staging.example` and the operator runbook **[runbooks/dr-rds.md](runbooks/dr-rds.md)** (RPO/RTO guidance, Multi-AZ enable steps, snapshot restore drill).

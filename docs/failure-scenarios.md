@@ -72,3 +72,4 @@ flowchart TD
 - Outbox poison after `MaxAttempts`; SQS DLQ after maxReceiveCount 5 — [event-contracts.md](event-contracts.md)
 - Circuit breaker + bulkhead on provider HTTP — [system-design.md](system-design.md)
 - Metrics / traces for backlog and recon lag — [observability.md](observability.md)
+- RDS Multi-AZ / snapshot restore drill — [runbooks/dr-rds.md](runbooks/dr-rds.md)
