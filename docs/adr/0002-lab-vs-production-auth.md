@@ -31,7 +31,8 @@ EntitleX supports local labs (Keycloak + optional DevToken HMAC) and cloud IdPs 
 
 - **Actors** (`RequestedBy` and similar) are bound from `ICurrentUser`, never from the client body.
 - **Resource reads** (request / approval / saga / audit): `PlatformAdmin`, `DealDeskManager`, and `RenewalManager` may read any request; others only their own (`RequestedBy == UserId`).
-- **Entitlement search**: `PlatformAdmin` and `DealDeskManager` only (no cross-customer harvest until a customer ACL claim exists).
+- **Customer ACL**: JWT multi-value claim `customer_ids` (DevToken body field or IdP protocol mapper). `PlatformAdmin` / `DealDeskManager` may access any customer; `RenewalRepresentative` (and other non-privileged roles) may search/create only for customers listed on the claim. Empty ACL denies customer-scoped operations.
+- **Entitlement search**: role policy `CanSearchEntitlements` (Rep / DealDesk / PlatformAdmin) plus per-customer ACL in `ResourceAuthorizationService`.
 
 ### Vendor simulators
 
@@ -41,6 +42,6 @@ EntitleX supports local labs (Keycloak + optional DevToken HMAC) and cloud IdPs 
 
 ## Consequences
 
-- Lab demos that need entitlement search + create should use **PlatformAdmin** (OIDC) or enable `AllowDevPlatformAdmin` consciously.
-- RenewalRepresentative create UX no longer includes unrestricted entitlement search; customer-scoped ACL is future work.
+- Lab demos: PlatformAdmin/DealDesk still search any customer; Reps mint DevToken with `customerIds: ["CUST-1"]` (or map Keycloak `customer_ids`).
 - Compose Keycloak / weak lab secrets remain disposable lab defaults (documented, not “rotated” as production secrets).
+- Keycloak lab: add a user attribute / protocol mapper emitting multi-value `customer_ids` on the access token when testing OIDC ACL paths.

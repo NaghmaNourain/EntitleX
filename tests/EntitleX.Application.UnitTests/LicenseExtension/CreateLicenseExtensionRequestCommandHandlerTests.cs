@@ -1,4 +1,5 @@
 using EntitleX.Application.Abstractions;
+using EntitleX.Application.Authorization;
 using EntitleX.Application.Common.Exceptions;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Models;
@@ -37,7 +38,11 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
         var outbox = new CapturingOutboxWriter();
         var unitOfWork = new CapturingUnitOfWork();
         var notifications = new NoopNotifications();
-        var currentUser = new FakeCurrentUser("user-rep-001", "Riley Rep", [EntitleXRoles.RenewalRepresentative]);
+        var currentUser = new FakeCurrentUser(
+            "user-rep-001",
+            "Riley Rep",
+            [EntitleXRoles.RenewalRepresentative],
+            ["CUST-1"]);
 
         var orchestrator = CreateOrchestrator(sagas, requests, outbox);
 
@@ -48,6 +53,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
             unitOfWork,
             notifications,
             currentUser,
+            new ResourceAuthorizationService(currentUser, requests),
             [new FakeEntitlementClient("CloudShield", Baseline)]);
 
         var dto = await handler.Handle(
@@ -83,7 +89,11 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
         var approvals = new FakeApprovalRepository();
         var sagas = new UnsavedBlindSagaRepository();
         var outbox = new CapturingOutboxWriter();
-        var currentUser = new FakeCurrentUser("user-bound-42", "Bound Actor", [EntitleXRoles.RenewalRepresentative]);
+        var currentUser = new FakeCurrentUser(
+            "user-bound-42",
+            "Bound Actor",
+            [EntitleXRoles.RenewalRepresentative],
+            ["CUST-1"]);
 
         var handler = new CreateLicenseExtensionRequestCommandHandler(
             requests,
@@ -92,6 +102,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
             new CapturingUnitOfWork(),
             new NoopNotifications(),
             currentUser,
+            new ResourceAuthorizationService(currentUser, requests),
             [new FakeEntitlementClient("CloudShield", Baseline)]);
 
         var dto = await handler.Handle(
@@ -113,13 +124,16 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
     [Fact]
     public async Task Handle_Unauthenticated_ThrowsForbidden()
     {
+        var unauth = new FakeCurrentUser(string.Empty, string.Empty, [], authenticated: false);
+        var requests = new FakeRequestRepository();
         var handler = new CreateLicenseExtensionRequestCommandHandler(
-            new FakeRequestRepository(),
+            requests,
             new FakeApprovalRepository(),
-            CreateOrchestrator(new UnsavedBlindSagaRepository(), new FakeRequestRepository(), new CapturingOutboxWriter()),
+            CreateOrchestrator(new UnsavedBlindSagaRepository(), requests, new CapturingOutboxWriter()),
             new CapturingUnitOfWork(),
             new NoopNotifications(),
-            new FakeCurrentUser(string.Empty, string.Empty, [], authenticated: false),
+            unauth,
+            new ResourceAuthorizationService(unauth, requests),
             [new FakeEntitlementClient("CloudShield", Baseline)]);
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
@@ -147,13 +161,19 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
 
         var orchestrator = CreateOrchestrator(sagas, requests, outbox);
 
+        var currentUser = new FakeCurrentUser(
+            "user-rep-001",
+            "Riley Rep",
+            [EntitleXRoles.RenewalRepresentative],
+            ["CUST-1"]);
         var handler = new CreateLicenseExtensionRequestCommandHandler(
             requests,
             approvals,
             orchestrator,
             unitOfWork,
             new NoopNotifications(),
-            new FakeCurrentUser("user-rep-001", "Riley Rep", [EntitleXRoles.RenewalRepresentative]),
+            currentUser,
+            new ResourceAuthorizationService(currentUser, requests),
             [new FakeEntitlementClient("CloudShield", Baseline)]);
 
         var dto = await handler.Handle(
@@ -298,6 +318,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
         string userId,
         string name,
         string[] roles,
+        string[]? customerIds = null,
         bool authenticated = true) : ICurrentUser
     {
         public bool IsAuthenticated => authenticated;
@@ -305,6 +326,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
         public string DisplayName => name;
         public string? Email => string.IsNullOrEmpty(userId) ? null : $"{userId}@entitlex.local";
         public IReadOnlyCollection<string> Roles => roles;
+        public IReadOnlyList<string> CustomerIds => customerIds ?? [];
         public bool IsInRole(string role) => roles.Contains(role, StringComparer.OrdinalIgnoreCase);
     }
 

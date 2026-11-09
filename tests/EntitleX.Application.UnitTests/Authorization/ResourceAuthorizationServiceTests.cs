@@ -59,35 +59,84 @@ public sealed class ResourceAuthorizationServiceTests
     }
 
     [Fact]
-    public void EnsureCanSearchEntitlements_PlatformAdmin_Allows()
+    public void EnsureCanAccessCustomer_PlatformAdmin_AllowsAny()
     {
         var sut = new ResourceAuthorizationService(
             new FakeCurrentUser("admin", [EntitleXRoles.PlatformAdmin]),
             new FakeRequestRepository());
 
-        sut.EnsureCanSearchEntitlements();
+        sut.EnsureCanAccessCustomer("CUST-ANY");
     }
 
     [Fact]
-    public void EnsureCanSearchEntitlements_DealDesk_Allows()
+    public void EnsureCanAccessCustomer_DealDesk_AllowsAny()
     {
         var sut = new ResourceAuthorizationService(
             new FakeCurrentUser("dd", [EntitleXRoles.DealDeskManager]),
             new FakeRequestRepository());
 
-        sut.EnsureCanSearchEntitlements();
+        sut.EnsureCanAccessCustomer("CUST-ANY");
+    }
+
+    [Fact]
+    public void EnsureCanAccessCustomer_RepWithAcl_AllowsListed()
+    {
+        var sut = new ResourceAuthorizationService(
+            new FakeCurrentUser(
+                "rep",
+                [EntitleXRoles.RenewalRepresentative],
+                ["CUST-1", "CUST-2"]),
+            new FakeRequestRepository());
+
+        sut.EnsureCanAccessCustomer("CUST-1");
+    }
+
+    [Fact]
+    public void EnsureCanAccessCustomer_RepWithAcl_DeniesUnlisted()
+    {
+        var sut = new ResourceAuthorizationService(
+            new FakeCurrentUser(
+                "rep",
+                [EntitleXRoles.RenewalRepresentative],
+                ["CUST-1"]),
+            new FakeRequestRepository());
+
+        Assert.Throws<ForbiddenException>(() => sut.EnsureCanAccessCustomer("CUST-OTHER"));
+    }
+
+    [Fact]
+    public void EnsureCanAccessCustomer_RepEmptyAcl_Denies()
+    {
+        var sut = new ResourceAuthorizationService(
+            new FakeCurrentUser("rep", [EntitleXRoles.RenewalRepresentative]),
+            new FakeRequestRepository());
+
+        Assert.Throws<ForbiddenException>(() => sut.EnsureCanAccessCustomer("CUST-1"));
+    }
+
+    [Fact]
+    public void EnsureCanSearchEntitlements_RepWithAcl_Allows()
+    {
+        var sut = new ResourceAuthorizationService(
+            new FakeCurrentUser(
+                "rep",
+                [EntitleXRoles.RenewalRepresentative],
+                ["CUST-1"]),
+            new FakeRequestRepository());
+
+        sut.EnsureCanSearchEntitlements("CUST-1");
     }
 
     [Theory]
     [InlineData(EntitleXRoles.RenewalRepresentative)]
     [InlineData(EntitleXRoles.RenewalManager)]
-    public void EnsureCanSearchEntitlements_OtherRoles_Deny(string role)
+    public void EnsureCanSearchEntitlements_OtherRolesWithoutAcl_Deny(string role)
     {
         var sut = new ResourceAuthorizationService(
             new FakeCurrentUser("user", [role]),
             new FakeRequestRepository());
 
-        Assert.Throws<ForbiddenException>(() => sut.EnsureCanSearchEntitlements());
+        Assert.Throws<ForbiddenException>(() => sut.EnsureCanSearchEntitlements("CUST-1"));
     }
 
     private static LicenseExtensionRequest CreateRequest(string requestedBy) =>
@@ -102,13 +151,14 @@ public sealed class ResourceAuthorizationServiceTests
                     Baseline.AddDays(14))
             ]);
 
-    private sealed class FakeCurrentUser(string userId, string[] roles) : ICurrentUser
+    private sealed class FakeCurrentUser(string userId, string[] roles, string[]? customerIds = null) : ICurrentUser
     {
         public bool IsAuthenticated => true;
         public string UserId => userId;
         public string DisplayName => userId;
         public string? Email => $"{userId}@entitlex.local";
         public IReadOnlyCollection<string> Roles => roles;
+        public IReadOnlyList<string> CustomerIds => customerIds ?? [];
         public bool IsInRole(string role) => roles.Contains(role, StringComparer.OrdinalIgnoreCase);
     }
 

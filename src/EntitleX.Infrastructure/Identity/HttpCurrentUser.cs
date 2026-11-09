@@ -6,6 +6,8 @@ namespace EntitleX.Infrastructure.Identity;
 
 public sealed class HttpCurrentUser : ICurrentUser
 {
+    public const string CustomerIdsClaimType = "customer_ids";
+
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public HttpCurrentUser(IHttpContextAccessor httpContextAccessor)
@@ -45,6 +47,24 @@ public sealed class HttpCurrentUser : ICurrentUser
             return fromRoleClaim
                 .Concat(fromRoles)
                 .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+    }
+
+    public IReadOnlyList<string> CustomerIds
+    {
+        get
+        {
+            if (Principal is null)
+            {
+                return Array.Empty<string>();
+            }
+
+            return Principal.FindAll(CustomerIdsClaimType)
+                .Select(c => c.Value)
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Select(v => v.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }

@@ -22,7 +22,15 @@ public interface IResourceAuthorizationService
     Task EnsureCanReadRequestAsync(RequestId requestId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Entitlement search may harvest across customers — only PlatformAdmin / DealDeskManager.
+    /// Ensures the caller may access data for <paramref name="customerId"/>.
+    /// PlatformAdmin / DealDeskManager may access any customer; others require
+    /// <paramref name="customerId"/> in <see cref="ICurrentUser.CustomerIds"/>.
     /// </summary>
-    void EnsureCanSearchEntitlements();
+    void EnsureCanAccessCustomer(string customerId);
+
+    /// <summary>
+    /// Entitlement search for a specific customer — authenticated +
+    /// <see cref="EnsureCanAccessCustomer"/>.
+    /// </summary>
+    void EnsureCanSearchEntitlements(string customerId);
 }

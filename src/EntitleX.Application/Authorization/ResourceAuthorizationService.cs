@@ -48,18 +48,34 @@ public sealed class ResourceAuthorizationService : IResourceAuthorizationService
         EnsureCanReadRequest(request);
     }
 
-    public void EnsureCanSearchEntitlements()
+    public void EnsureCanAccessCustomer(string customerId)
     {
         EnsureAuthenticated();
 
-        if (_currentUser.IsInRole(EntitleXRoles.PlatformAdmin)
-            || _currentUser.IsInRole(EntitleXRoles.DealDeskManager))
+        if (string.IsNullOrWhiteSpace(customerId))
+        {
+            throw new ForbiddenException("A customer id is required.");
+        }
+
+        if (HasUnrestrictedCustomerAccess())
+        {
+            return;
+        }
+
+        var normalized = customerId.Trim();
+        if (_currentUser.CustomerIds.Any(id =>
+                string.Equals(id, normalized, StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
 
         throw new ForbiddenException(
-            "Entitlement search across customers requires PlatformAdmin or DealDeskManager.");
+            $"You are not allowed to access customer '{normalized}'.");
+    }
+
+    public void EnsureCanSearchEntitlements(string customerId)
+    {
+        EnsureCanAccessCustomer(customerId);
     }
 
     private void EnsureAuthenticated()
@@ -74,6 +90,10 @@ public sealed class ResourceAuthorizationService : IResourceAuthorizationService
         _currentUser.IsInRole(EntitleXRoles.PlatformAdmin)
         || _currentUser.IsInRole(EntitleXRoles.DealDeskManager)
         || _currentUser.IsInRole(EntitleXRoles.RenewalManager);
+
+    private bool HasUnrestrictedCustomerAccess() =>
+        _currentUser.IsInRole(EntitleXRoles.PlatformAdmin)
+        || _currentUser.IsInRole(EntitleXRoles.DealDeskManager);
 
     private bool IsRequestOwner(LicenseExtensionRequest request) =>
         !string.IsNullOrWhiteSpace(_currentUser.UserId)

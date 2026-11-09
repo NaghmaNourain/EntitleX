@@ -9,6 +9,7 @@ import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
 import Stack from '@mui/material/Stack'
+import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -31,13 +32,26 @@ export function LoginPage() {
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? '/'
   const [role, setRole] = useState<EntitleXRole>('RenewalRepresentative')
+  const [customerIdsText, setCustomerIdsText] = useState('CUST-1')
 
   const oidcMutation = useMutation({
     mutationFn: () => loginWithOidc(),
   })
 
+  const parseCustomerIds = () =>
+    customerIdsText
+      .split(/[,\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+
   const devMutation = useMutation({
-    mutationFn: () => loginWithRole(role),
+    mutationFn: () =>
+      loginWithRole(
+        role,
+        role === 'RenewalRepresentative' || role === 'RenewalManager'
+          ? parseCustomerIds()
+          : undefined,
+      ),
     onSuccess: () => navigate(from, { replace: true }),
   })
 
@@ -136,6 +150,16 @@ export function LoginPage() {
                 </Select>
                 <FormHelperText>Maps to seeded local users for RBAC testing</FormHelperText>
               </FormControl>
+
+              {(role === 'RenewalRepresentative' || role === 'RenewalManager') && (
+                <TextField
+                  label="Customer ACL (customer_ids)"
+                  value={customerIdsText}
+                  onChange={(e) => setCustomerIdsText(e.target.value)}
+                  helperText="Comma-separated customer ids for scoped search/create (lab)."
+                  fullWidth
+                />
+              )}
 
               <ErrorAlert error={devMutation.error} title="DevToken login failed" />
 

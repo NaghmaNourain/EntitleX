@@ -23,14 +23,15 @@ public sealed class SearchCustomerEntitlementsQueryHandler
         SearchCustomerEntitlementsQuery request,
         CancellationToken cancellationToken)
     {
-        _authorization.EnsureCanSearchEntitlements();
+        var customerId = request.CustomerId.Trim();
+        _authorization.EnsureCanSearchEntitlements(customerId);
 
         var correlationId = string.IsNullOrWhiteSpace(request.CorrelationId)
             ? Guid.NewGuid().ToString("N")
             : request.CorrelationId.Trim();
 
         return _aggregation.AggregateForCustomerAsync(
-            request.CustomerId.Trim(),
+            customerId,
             correlationId,
             cancellationToken);
     }

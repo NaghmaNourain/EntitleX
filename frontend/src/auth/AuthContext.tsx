@@ -33,7 +33,7 @@ interface AuthState {
   enableDevToken: boolean
   loginWithOidc: () => Promise<void>
   completeOidcCallback: () => Promise<void>
-  loginWithRole: (role: EntitleXRole) => Promise<void>
+  loginWithRole: (role: EntitleXRole, customerIds?: string[]) => Promise<void>
   logout: () => Promise<void>
   hasRole: (...roles: EntitleXRole[]) => boolean
 }
@@ -131,17 +131,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(session.user)
   }, [])
 
-  const loginWithRole = useCallback(async (role: EntitleXRole) => {
+  const loginWithRole = useCallback(async (role: EntitleXRole, customerIds?: string[]) => {
     if (!authConfig.enableDevToken) {
       throw new Error('DevToken login is disabled (set VITE_ENABLE_DEV_TOKEN=true).')
     }
-    const response = await api.mintDevToken(role)
+    const response = await api.mintDevToken(role, customerIds)
     const nextUser: AuthUser = {
       userId: response.user.userId,
       displayName: response.user.displayName,
       email: response.user.email,
       role: response.user.role,
       roles: [response.user.role],
+      customerIds: response.user.customerIds ?? customerIds ?? [],
     }
     persistSession(response.accessToken, nextUser, 'devtoken')
     setToken(response.accessToken)

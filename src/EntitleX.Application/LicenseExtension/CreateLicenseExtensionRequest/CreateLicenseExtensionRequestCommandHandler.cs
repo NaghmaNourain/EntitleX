@@ -19,6 +19,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IApprovalNotificationService _notifications;
     private readonly ICurrentUser _currentUser;
+    private readonly IResourceAuthorizationService _authorization;
     private readonly IReadOnlyDictionary<string, IProviderEntitlementClient> _providers;
 
     public CreateLicenseExtensionRequestCommandHandler(
@@ -28,6 +29,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
         IUnitOfWork unitOfWork,
         IApprovalNotificationService notifications,
         ICurrentUser currentUser,
+        IResourceAuthorizationService authorization,
         IEnumerable<IProviderEntitlementClient> providers)
     {
         _repository = repository;
@@ -36,6 +38,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
         _unitOfWork = unitOfWork;
         _notifications = notifications;
         _currentUser = currentUser;
+        _authorization = authorization;
         _providers = providers.ToDictionary(
             p => p.ProviderName,
             StringComparer.OrdinalIgnoreCase);
@@ -92,6 +95,8 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
                 cancellationToken)
                 ?? throw new NotFoundException(
                     $"Entitlement '{item.EntitlementId}' was not found at provider '{provider}'.");
+
+            _authorization.EnsureCanAccessCustomer(entitlement.CustomerId);
 
             // Always use provider-sourced expiry — client baselines are hints only.
             items.Add((
