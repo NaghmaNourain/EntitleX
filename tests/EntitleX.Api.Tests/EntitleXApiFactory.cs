@@ -11,7 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using Testcontainers.PostgreSql;
 
 namespace EntitleX.Api.Tests;
 
@@ -19,26 +18,19 @@ public sealed class EntitleXApiFactory : WebApplicationFactory<Program>, IAsyncL
 {
     public const string SigningKey = "EntitleX-Api-Tests-Signing-Key-32chars!";
 
-    private PostgreSqlContainer? _postgres;
+    private TestPostgresLease? _postgres;
 
     public string ConnectionString { get; private set; } = string.Empty;
 
     public async Task InitializeAsync()
     {
-        if (!DockerAvailability.IsAvailable)
+        if (!TestPostgres.IsConfigured)
         {
             return;
         }
 
-        _postgres = new PostgreSqlBuilder()
-            .WithImage("postgres:16-alpine")
-            .WithDatabase("entitlex_platform")
-            .WithUsername("entitlex")
-            .WithPassword("entitlex")
-            .Build();
-
-        await _postgres.StartAsync();
-        ConnectionString = _postgres.GetConnectionString();
+        _postgres = await TestPostgres.AcquireAsync();
+        ConnectionString = _postgres.ConnectionString;
     }
 
     public new async Task DisposeAsync()
@@ -57,8 +49,8 @@ public sealed class EntitleXApiFactory : WebApplicationFactory<Program>, IAsyncL
         if (string.IsNullOrWhiteSpace(ConnectionString))
         {
             throw new InvalidOperationException(
-                "EntitleXApiFactory.ConnectionString is empty; Testcontainers PostgreSQL was not started. " +
-                "API integration tests require Docker.");
+                "EntitleXApiFactory.ConnectionString is empty; Postgres was not started. " +
+                $"Set {TestPostgres.EnvVar} or enable Docker.");
         }
 
         builder.UseEnvironment(Environments.Development);
@@ -104,8 +96,6 @@ public sealed class EntitleXApiFactory : WebApplicationFactory<Program>, IAsyncL
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
-        // Program.cs assigns a Serilog bootstrap logger and UseSerilog freezes it.
-        // Reset between host builds so a misconfigured parallel fixture cannot poison the run.
         Log.CloseAndFlush();
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Warning()
@@ -119,6 +109,7 @@ public sealed class EntitleXApiFactory : WebApplicationFactory<Program>, IAsyncL
     {
         await using var scope = Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<EntitleXDbContext>();
+        await db.Database.EnsureDeletedAsync();
         await db.Database.MigrateAsync();
     }
 

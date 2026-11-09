@@ -2,36 +2,28 @@ using CloudShield.Domain.Entitlements;
 using CloudShield.Infrastructure.Persistence;
 using CloudShield.Application.Models;
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.PostgreSql;
 
 namespace CloudShield.Infrastructure.IntegrationTests;
 
 public sealed class LicenseExtensionApplierTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _container;
+    private TestPostgresLease? _postgres;
 
     public async Task InitializeAsync()
     {
-        if (!DockerAvailability.IsAvailable)
+        if (!TestPostgres.IsConfigured)
         {
             return;
         }
 
-        _container = new PostgreSqlBuilder()
-            .WithImage("postgres:16-alpine")
-            .WithDatabase("cloudshield")
-            .WithUsername("entitlex")
-            .WithPassword("entitlex")
-            .Build();
-
-        await _container.StartAsync();
+        _postgres = await TestPostgres.AcquireAsync();
     }
 
     public async Task DisposeAsync()
     {
-        if (_container is not null)
+        if (_postgres is not null)
         {
-            await _container.DisposeAsync();
+            await _postgres.DisposeAsync();
         }
     }
 
@@ -78,10 +70,10 @@ public sealed class LicenseExtensionApplierTests : IAsyncLifetime
 
     private CloudShieldDbContext CreateDbContext()
     {
-        Assert.NotNull(_container);
+        Assert.NotNull(_postgres);
 
         var options = new DbContextOptionsBuilder<CloudShieldDbContext>()
-            .UseNpgsql(_container.GetConnectionString(), npgsql =>
+            .UseNpgsql(_postgres.ConnectionString, npgsql =>
             {
                 npgsql.MigrationsAssembly(typeof(CloudShieldDbContext).Assembly.FullName);
             })

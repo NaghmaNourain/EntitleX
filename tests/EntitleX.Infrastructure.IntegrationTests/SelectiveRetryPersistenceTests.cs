@@ -9,7 +9,6 @@ using EntitleX.Infrastructure.Retry;
 using EntitleX.Messaging.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using Testcontainers.PostgreSql;
 
 namespace EntitleX.Infrastructure.IntegrationTests;
 
@@ -21,30 +20,23 @@ public sealed class SelectiveRetryPersistenceTests : IAsyncLifetime
 {
     private static readonly DateTimeOffset Baseline = DateTimeOffset.Parse("2026-06-01T00:00:00Z");
 
-    private PostgreSqlContainer? _container;
+    private TestPostgresLease? _postgres;
 
     public async Task InitializeAsync()
     {
-        if (!DockerAvailability.IsAvailable)
+        if (!TestPostgres.IsConfigured)
         {
             return;
         }
 
-        _container = new PostgreSqlBuilder()
-            .WithImage("postgres:16-alpine")
-            .WithDatabase("entitlex_platform")
-            .WithUsername("entitlex")
-            .WithPassword("entitlex")
-            .Build();
-
-        await _container.StartAsync();
+        _postgres = await TestPostgres.AcquireAsync();
     }
 
     public async Task DisposeAsync()
     {
-        if (_container is not null)
+        if (_postgres is not null)
         {
-            await _container.DisposeAsync();
+            await _postgres.DisposeAsync();
         }
     }
 
@@ -262,9 +254,9 @@ public sealed class SelectiveRetryPersistenceTests : IAsyncLifetime
 
     private EntitleXDbContext CreateDbContext()
     {
-        Assert.NotNull(_container);
+        Assert.NotNull(_postgres);
         var options = new DbContextOptionsBuilder<EntitleXDbContext>()
-            .UseNpgsql(_container!.GetConnectionString(), npgsql =>
+            .UseNpgsql(_postgres.ConnectionString, npgsql =>
             {
                 npgsql.MigrationsAssembly(typeof(EntitleXDbContext).Assembly.FullName);
             })

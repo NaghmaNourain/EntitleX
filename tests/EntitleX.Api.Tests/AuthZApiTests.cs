@@ -24,7 +24,7 @@ public sealed class AuthZApiTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        if (!DockerAvailability.IsAvailable)
+        if (!TestPostgres.IsConfigured)
         {
             return;
         }

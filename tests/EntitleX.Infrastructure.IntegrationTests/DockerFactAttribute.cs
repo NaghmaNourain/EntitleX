@@ -1,14 +1,19 @@
 namespace EntitleX.Infrastructure.IntegrationTests;
 
-/// <summary>Skips the test when Docker is not available for Testcontainers.</summary>
+/// <summary>
+/// Skips when neither a CI Postgres env var nor a local (non-CI) Docker daemon is available.
+/// Shared with CloudShield.Infrastructure.IntegrationTests via linked compile.
+/// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 public sealed class DockerFactAttribute : FactAttribute
 {
     public DockerFactAttribute()
     {
-        if (!DockerAvailability.IsAvailable)
+        if (!DockerAvailability.CanRunIntegrationTests)
         {
-            Skip = "Docker is not available; Testcontainers PostgreSQL integration tests were skipped.";
+            Skip =
+                "Postgres integration tests require ENTITLEX_TEST_POSTGRES / CLOUDSHIELD_TEST_POSTGRES " +
+                "(preferred in CI) or a local Docker daemon for Testcontainers.";
         }
     }
 }

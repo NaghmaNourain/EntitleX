@@ -1,14 +1,15 @@
 namespace EntitleX.Api.Tests;
 
-/// <summary>Skips the test when Docker is not available for Testcontainers.</summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 public sealed class DockerFactAttribute : FactAttribute
 {
     public DockerFactAttribute()
     {
-        if (!DockerAvailability.IsAvailable)
+        if (!TestPostgres.IsConfigured)
         {
-            Skip = "Docker is not available; WebApplicationFactory API tests were skipped.";
+            Skip =
+                $"API integration tests require {TestPostgres.EnvVar} (preferred in CI) " +
+                "or a local Docker daemon for Testcontainers.";
         }
     }
 }
