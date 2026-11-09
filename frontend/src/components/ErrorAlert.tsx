@@ -11,7 +11,7 @@ export function ErrorAlert({ error, title = 'Something went wrong' }: { error: u
   if (error instanceof ApiError) {
     const validation = formatValidationErrors(error.problem)
     return (
-      <Alert severity="error" role="alert" sx={{ mb: 2 }}>
+      <Alert severity="error" role="alert" aria-live="assertive" sx={{ mb: 2 }}>
         <AlertTitle>
           {title} ({error.status})
         </AlertTitle>
@@ -31,7 +31,7 @@ export function ErrorAlert({ error, title = 'Something went wrong' }: { error: u
 
   const message = error instanceof Error ? error.message : 'Unexpected error'
   return (
-    <Alert severity="error" role="alert" sx={{ mb: 2 }}>
+    <Alert severity="error" role="alert" aria-live="assertive" sx={{ mb: 2 }}>
       <AlertTitle>{title}</AlertTitle>
       {message}
     </Alert>
