@@ -38,8 +38,10 @@ docker build -f infra/docker/images/Dockerfile.simulator \
   --build-arg DLL_NAME=NetworkGuard.Api.dll \
   -t entitlex-networkguard:local .
 
-# Frontend
+# Frontend (listens on :8080 as non-root `nginx` user)
 docker build -f infra/docker/images/Dockerfile.frontend -t entitlex-frontend:local .
 ```
+
+All five Dockerfiles run as a non-root user and define a `HEALTHCHECK` (HTTP `/health` or `/healthz` for hosts; process/file checks for workers/lambdas).
 
 Credentials are **never** baked into images. Inject via ECS task secrets / env from Secrets Manager at runtime.
