@@ -58,7 +58,7 @@ dotnet run --project src/lambdas/EntitleX.ExpirationNotification -- --provider N
 
 # 7. Frontend (proxies /api and /health to :5080)
 cd frontend && npm ci && npm run dev                                # :5173
-# Rider: use shared run config "API + Frontend" (or "frontend") under .run/ — see frontend/README.md
+# Rider: use shared run config "Lab Full Stack" under .run/ (Compose + API + SPA + simulators + workers)
 
 # 8. Tests
 dotnet test tests/EntitleX.Domain.UnitTests
