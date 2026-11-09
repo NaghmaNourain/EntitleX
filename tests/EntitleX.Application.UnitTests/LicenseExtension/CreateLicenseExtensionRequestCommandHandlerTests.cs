@@ -67,12 +67,12 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
         Assert.Equal(Baseline, requests.Store.Values.Single().Items[0].CurrentExpiryUtc);
         Assert.Equal("user-rep-001", dto.RequestedBy);
         Assert.NotNull(outbox.LastEnvelope);
-        Assert.Equal(MessageTypes.FulfillmentCommand, outbox.LastEnvelope!.MessageType);
+        Assert.Equal(MessageTypes.ProviderLicenseExtensionCommand, outbox.LastEnvelope!.MessageType);
         Assert.Equal(1, unitOfWork.SaveCount);
 
         var persistedSaga = sagas.Pending.Single();
         Assert.Equal(dto.Id, persistedSaga.RequestId.Value);
-        Assert.Equal(SagaState.QueuedForFulfillment, persistedSaga.State);
+        Assert.Equal(SagaState.Processing, persistedSaga.State);
         Assert.Equal(ApprovalBand.AutoApprove, persistedSaga.ApprovalBand);
     }
 

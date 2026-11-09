@@ -48,6 +48,9 @@ public sealed class KafkaOptions
 
     public string ProviderResultsTopic { get; set; } = "entitlex.provider.results";
 
+    /// <summary>Dead-letter topic for poison provider-result messages after MaxProcessAttempts.</summary>
+    public string ProviderResultsDlqTopic { get; set; } = "entitlex.provider.results.dlq";
+
     public string FulfillmentConsumerGroup { get; set; } = "entitlex-fulfillment";
 
     public string ProviderResultsConsumerGroup { get; set; } = "entitlex-orchestrator-results";
@@ -55,6 +58,9 @@ public sealed class KafkaOptions
     public string CloudShieldConsumerGroup { get; set; } = "cloudshield-commands";
 
     public string NetworkGuardConsumerGroup { get; set; } = "networkguard-commands";
+
+    /// <summary>After this many consecutive handle failures for one offset, publish to DLQ and commit.</summary>
+    public int ProviderResultsMaxProcessAttempts { get; set; } = 5;
 }
 
 public sealed class OutboxOptions
@@ -75,4 +81,13 @@ public sealed class OutboxOptions
 public sealed class FulfillmentOptions
 {
     public int IdleDelayMilliseconds { get; set; } = 500;
+
+    /// <summary>
+    /// When true, run the legacy SQS→Kafka fulfillment dispatcher (for in-flight
+    /// backlog). Prefer Messaging:Fulfillment:PreferDirectKafka=true instead.
+    /// </summary>
+    public bool EnableSqsDispatcher { get; set; }
+
+    /// <summary>How often to extend SQS visibility while processing a message.</summary>
+    public int VisibilityHeartbeatSeconds { get; set; } = 10;
 }
