@@ -19,7 +19,7 @@ function addDaysIso(iso: string, days: number): string {
 }
 
 export function CreateExtensionRequestPage() {
-  const { user, hasRole } = useAuth()
+  const { hasRole } = useAuth()
   const cart = useSelectionCart()
   const navigate = useNavigate()
   const [extensionDays, setExtensionDays] = useState(30)
@@ -38,7 +38,6 @@ export function CreateExtensionRequestPage() {
   const mutation = useMutation({
     mutationFn: () =>
       api.createLicenseExtensionRequest({
-        requestedBy: user?.userId ?? 'unknown',
         extensionNumber: extensionNumber.trim() || null,
         items: preview.map((item) => ({
           entitlementId: item.entitlementId,

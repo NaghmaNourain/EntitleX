@@ -16,25 +16,36 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
     private readonly ILicenseExtensionSagaOrchestrator _sagaOrchestrator;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IApprovalNotificationService _notifications;
+    private readonly ICurrentUser _currentUser;
 
     public CreateLicenseExtensionRequestCommandHandler(
         ILicenseExtensionRequestRepository repository,
         IApprovalCaseRepository approvalRepository,
         ILicenseExtensionSagaOrchestrator sagaOrchestrator,
         IUnitOfWork unitOfWork,
-        IApprovalNotificationService notifications)
+        IApprovalNotificationService notifications,
+        ICurrentUser currentUser)
     {
         _repository = repository;
         _approvalRepository = approvalRepository;
         _sagaOrchestrator = sagaOrchestrator;
         _unitOfWork = unitOfWork;
         _notifications = notifications;
+        _currentUser = currentUser;
     }
 
     public async Task<LicenseExtensionRequestDto> Handle(
         CreateLicenseExtensionRequestCommand request,
         CancellationToken cancellationToken)
     {
+        if (!_currentUser.IsAuthenticated || string.IsNullOrWhiteSpace(_currentUser.UserId))
+        {
+            throw new ForbiddenException("Authentication is required to create a request.");
+        }
+
+        // Bind actor from authenticated identity — never from the client body.
+        var requestedBy = _currentUser.UserId;
+
         var extensionNumber = string.IsNullOrWhiteSpace(request.ExtensionNumber)
             ? GenerateExtensionNumber()
             : request.ExtensionNumber.Trim();
@@ -53,7 +64,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
 
         var aggregate = LicenseExtensionRequest.CreateFresh(
             extensionNumber,
-            request.RequestedBy,
+            requestedBy,
             items);
 
         aggregate.Submit();

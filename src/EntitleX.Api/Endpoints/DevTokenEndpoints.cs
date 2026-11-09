@@ -45,6 +45,19 @@ public static class DevTokenEndpoints
             });
         }
 
+        if (string.Equals(request.Role, EntitleXRoles.PlatformAdmin, StringComparison.Ordinal)
+            && !jwtOptions.Value.AllowDevPlatformAdmin)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["role"] =
+                [
+                    "Minting PlatformAdmin via DevToken requires Jwt:AllowDevPlatformAdmin=true " +
+                    "(default false). Prefer Keycloak OIDC for admin labs."
+                ]
+            });
+        }
+
         var seed = DevUserDirectory.Resolve(request.Role);
         var token = tokens.CreateToken(
             seed.UserId,

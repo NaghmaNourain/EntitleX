@@ -19,4 +19,10 @@ public sealed class JwtOptions
     /// Must remain false in Production (enforced at startup).
     /// </summary>
     public bool EnableDevTokenEndpoint { get; set; }
+
+    /// <summary>
+    /// When true, DevToken may mint <c>PlatformAdmin</c>. Defaults to false so a
+    /// mis-set Development environment cannot anonymously mint full admin without intent.
+    /// </summary>
+    public bool AllowDevPlatformAdmin { get; set; }
 }

@@ -96,7 +96,7 @@ export interface CreateLicenseExtensionRequestItem {
 }
 
 export interface CreateLicenseExtensionRequestBody {
-  requestedBy: string
+  /** Actor is bound server-side from the JWT; do not send client RequestedBy. */
   extensionNumber?: string | null
   items: CreateLicenseExtensionRequestItem[]
 }

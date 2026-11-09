@@ -1,10 +1,12 @@
 using EntitleX.Application.Abstractions;
+using EntitleX.Application.Common.Exceptions;
 using EntitleX.Application.EntitlementAggregation.Models;
 using EntitleX.Application.Fulfillment;
 using EntitleX.Application.LicenseExtension.CreateLicenseExtensionRequest;
 using EntitleX.Application.Saga;
 using EntitleX.BuildingBlocks.Ids;
 using EntitleX.Domain.Approval;
+using EntitleX.Domain.Identity;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;
 using EntitleX.Messaging.Contracts;
@@ -19,6 +21,7 @@ namespace EntitleX.Application.UnitTests.LicenseExtension;
 /// StartForRequestAsync AddAsync, but RequireSagaAsync re-queried the repository.
 /// EF Core (and this blind fake) does not return Added-but-unsaved entities, which
 /// threw InvalidOperationException "Saga for request was not found".
+/// Also covers H3: RequestedBy is bound from ICurrentUser, not the client body.
 /// </summary>
 public sealed class CreateLicenseExtensionRequestCommandHandlerTests
 {
@@ -33,6 +36,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
         var outbox = new CapturingOutboxWriter();
         var unitOfWork = new CapturingUnitOfWork();
         var notifications = new NoopNotifications();
+        var currentUser = new FakeCurrentUser("user-rep-001", "Riley Rep", [EntitleXRoles.RenewalRepresentative]);
 
         var orchestrator = CreateOrchestrator(sagas, requests, outbox);
 
@@ -41,11 +45,11 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
             approvals,
             orchestrator,
             unitOfWork,
-            notifications);
+            notifications,
+            currentUser);
 
         var dto = await handler.Handle(
             new CreateLicenseExtensionRequestCommand(
-                "user-rep-001",
                 ExtensionNumber: null,
                 Items:
                 [
@@ -58,6 +62,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
             CancellationToken.None);
 
         Assert.Equal(LicenseExtensionRequestStatus.InFulfillment.ToString(), dto.Status);
+        Assert.Equal("user-rep-001", dto.RequestedBy);
         Assert.NotNull(outbox.LastEnvelope);
         Assert.Equal(MessageTypes.FulfillmentCommand, outbox.LastEnvelope!.MessageType);
         Assert.Equal(1, unitOfWork.SaveCount);
@@ -66,6 +71,64 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
         Assert.Equal(dto.Id, persistedSaga.RequestId.Value);
         Assert.Equal(SagaState.QueuedForFulfillment, persistedSaga.State);
         Assert.Equal(ApprovalBand.AutoApprove, persistedSaga.ApprovalBand);
+    }
+
+    [Fact]
+    public async Task Handle_BindsRequestedBy_FromCurrentUser_IgnoringClient()
+    {
+        var requests = new FakeRequestRepository();
+        var approvals = new FakeApprovalRepository();
+        var sagas = new UnsavedBlindSagaRepository();
+        var outbox = new CapturingOutboxWriter();
+        var currentUser = new FakeCurrentUser("user-bound-42", "Bound Actor", [EntitleXRoles.RenewalRepresentative]);
+
+        var handler = new CreateLicenseExtensionRequestCommandHandler(
+            requests,
+            approvals,
+            CreateOrchestrator(sagas, requests, outbox),
+            new CapturingUnitOfWork(),
+            new NoopNotifications(),
+            currentUser);
+
+        var dto = await handler.Handle(
+            new CreateLicenseExtensionRequestCommand(
+                "EXT-ACTOR-1",
+                [
+                    new CreateLicenseExtensionRequestItemDto(
+                        "ent-cs-1",
+                        "CloudShield",
+                        Baseline,
+                        Baseline.AddDays(14))
+                ]),
+            CancellationToken.None);
+
+        Assert.Equal("user-bound-42", dto.RequestedBy);
+        Assert.Equal("user-bound-42", requests.Store.Values.Single().RequestedBy);
+    }
+
+    [Fact]
+    public async Task Handle_Unauthenticated_ThrowsForbidden()
+    {
+        var handler = new CreateLicenseExtensionRequestCommandHandler(
+            new FakeRequestRepository(),
+            new FakeApprovalRepository(),
+            CreateOrchestrator(new UnsavedBlindSagaRepository(), new FakeRequestRepository(), new CapturingOutboxWriter()),
+            new CapturingUnitOfWork(),
+            new NoopNotifications(),
+            new FakeCurrentUser(string.Empty, string.Empty, [], authenticated: false));
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            handler.Handle(
+                new CreateLicenseExtensionRequestCommand(
+                    null,
+                    [
+                        new CreateLicenseExtensionRequestItemDto(
+                            "ent-cs-1",
+                            "CloudShield",
+                            Baseline,
+                            Baseline.AddDays(14))
+                    ]),
+                CancellationToken.None));
     }
 
     [Fact]
@@ -84,11 +147,11 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
             approvals,
             orchestrator,
             unitOfWork,
-            new NoopNotifications());
+            new NoopNotifications(),
+            new FakeCurrentUser("user-rep-001", "Riley Rep", [EntitleXRoles.RenewalRepresentative]));
 
         var dto = await handler.Handle(
             new CreateLicenseExtensionRequestCommand(
-                "user-rep-001",
                 "EXT-HUMAN-1",
                 [
                     new CreateLicenseExtensionRequestItemDto(
@@ -120,10 +183,6 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
             new LoggingSagaTimeoutHook(NullLogger<LoggingSagaTimeoutHook>.Instance),
             NullLogger<LicenseExtensionSagaOrchestrator>.Instance);
 
-    /// <summary>
-    /// Mimics EF Core: GetByRequestIdAsync only returns entities that were SaveChanges'd,
-    /// not those sitting in the change tracker as Added.
-    /// </summary>
     private sealed class UnsavedBlindSagaRepository : ILicenseExtensionSagaRepository
     {
         private readonly List<LicenseExtensionSaga> _pending = [];
@@ -166,23 +225,23 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
 
     private sealed class FakeRequestRepository : ILicenseExtensionRequestRepository
     {
-        private readonly Dictionary<Guid, LicenseExtensionRequest> _store = new();
+        public Dictionary<Guid, LicenseExtensionRequest> Store { get; } = new();
 
         public Task AddAsync(LicenseExtensionRequest request, CancellationToken cancellationToken = default)
         {
-            _store[request.Id.Value] = request;
+            Store[request.Id.Value] = request;
             return Task.CompletedTask;
         }
 
         public Task<LicenseExtensionRequest?> GetByIdAsync(
             RequestId id,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(_store.TryGetValue(id.Value, out var r) ? r : null);
+            Task.FromResult(Store.TryGetValue(id.Value, out var r) ? r : null);
 
         public Task<bool> ExtensionNumberExistsAsync(
             string extensionNumber,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(_store.Values.Any(r => r.ExtensionNumber == extensionNumber));
+            Task.FromResult(Store.Values.Any(r => r.ExtensionNumber == extensionNumber));
     }
 
     private sealed class FakeApprovalRepository : IApprovalCaseRepository
@@ -227,6 +286,20 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
             SaveCount++;
             return Task.FromResult(1);
         }
+    }
+
+    private sealed class FakeCurrentUser(
+        string userId,
+        string name,
+        string[] roles,
+        bool authenticated = true) : ICurrentUser
+    {
+        public bool IsAuthenticated => authenticated;
+        public string UserId => userId;
+        public string DisplayName => name;
+        public string? Email => string.IsNullOrEmpty(userId) ? null : $"{userId}@entitlex.local";
+        public IReadOnlyCollection<string> Roles => roles;
+        public bool IsInRole(string role) => roles.Contains(role, StringComparer.OrdinalIgnoreCase);
     }
 
     private sealed class NoopNotifications : IApprovalNotificationService

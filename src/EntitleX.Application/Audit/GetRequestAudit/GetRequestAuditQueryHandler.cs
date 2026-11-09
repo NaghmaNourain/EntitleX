@@ -8,10 +8,14 @@ public sealed class GetRequestAuditQueryHandler
     : IRequestHandler<GetRequestAuditQuery, RequestAuditPageDto>
 {
     private readonly IAuditEventStore _audit;
+    private readonly IResourceAuthorizationService _authorization;
 
-    public GetRequestAuditQueryHandler(IAuditEventStore audit)
+    public GetRequestAuditQueryHandler(
+        IAuditEventStore audit,
+        IResourceAuthorizationService authorization)
     {
         _audit = audit;
+        _authorization = authorization;
     }
 
     public async Task<RequestAuditPageDto> Handle(
@@ -19,6 +23,8 @@ public sealed class GetRequestAuditQueryHandler
         CancellationToken cancellationToken)
     {
         var requestId = RequestId.From(query.RequestId);
+        await _authorization.EnsureCanReadRequestAsync(requestId, cancellationToken);
+
         IReadOnlyList<AuditEventRecord> events;
 
         if (query.Take is not null)

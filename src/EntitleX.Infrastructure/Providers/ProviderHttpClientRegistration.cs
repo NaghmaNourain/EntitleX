@@ -65,6 +65,7 @@ internal static class ProviderHttpClientRegistration
                 client.Timeout = Timeout.InfiniteTimeSpan; // Polly owns timeouts
             })
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddHttpMessageHandler(() => new SimulatorApiKeyDelegatingHandler(endpoint.ApiKey))
             .AddHttpMessageHandler(() => new ProviderLatencyDelegatingHandler(providerLabel))
             .AddResilienceHandler(pipelineName, builder =>
             {
@@ -114,6 +115,7 @@ internal static class ProviderHttpClientRegistration
                 client.Timeout = Timeout.InfiniteTimeSpan;
             })
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddHttpMessageHandler(() => new SimulatorApiKeyDelegatingHandler(endpoint.ApiKey))
             .AddHttpMessageHandler(() => new ProviderLatencyDelegatingHandler(providerLabel))
             .AddResilienceHandler(pipelineName, builder =>
             {

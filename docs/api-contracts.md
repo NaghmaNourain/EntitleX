@@ -12,7 +12,7 @@ Authoritative inventory of HTTP endpoints as of Phase 12. Auth policies live in 
 | `CanManageReconciliation` | `PlatformAdmin` |
 | Default `RequireAuthorization()` | authenticated |
 
-Simulators (**CloudShield**, **NetworkGuard**) have **no JWT**.
+Simulators (**CloudShield**, **NetworkGuard**) use **`X-Api-Key`** (`SimulatorAuth:ApiKey`), not JWT. Bound to `127.0.0.1` in lab.
 
 ---
 
@@ -37,14 +37,15 @@ OIDC (generic): `Oidc:Enabled`, `Oidc:Authority`, `Oidc:Audience`, `Oidc:RoleCla
 |--------|------|------|---------|
 | `POST` | `/api/v1/dev/tokens` | Anonymous; **Development only** when `Jwt:EnableDevTokenEndpoint` (disabled in Production) | `DevTokenEndpoints.MintAsync` |
 
-Body: `{ "role": "RenewalRepresentative" | "RenewalManager" | "DealDeskManager" | "PlatformAdmin" }`. Prefer Keycloak OIDC locally when Compose Keycloak is up.
+Body: `{ "role": "RenewalRepresentative" | "RenewalManager" | "DealDeskManager" | "PlatformAdmin" }`.
+`PlatformAdmin` requires `Jwt:AllowDevPlatformAdmin=true` (default false). Prefer Keycloak OIDC locally when Compose Keycloak is up.
 
 ### License extension requests
 
 | Method | Path | Auth | Handler |
 |--------|------|------|---------|
-| `POST` | `/api/v1/license-extension-requests/` | `CanCreateRequests` | `LicenseExtensionEndpoints.CreateAsync` → `CreateLicenseExtensionRequestCommand` |
-| `GET` | `/api/v1/license-extension-requests/{id}` | Authenticated | `LicenseExtensionEndpoints.GetByIdAsync` → `GetLicenseExtensionRequestQuery` |
+| `POST` | `/api/v1/license-extension-requests/` | `CanCreateRequests` | `LicenseExtensionEndpoints.CreateAsync` → `CreateLicenseExtensionRequestCommand` (`RequestedBy` bound from JWT; client actor ignored) |
+| `GET` | `/api/v1/license-extension-requests/{id}` | Authenticated + resource auth | Owner, or RenewalManager / DealDeskManager / PlatformAdmin |
 | `POST` | `/api/v1/license-extensions/{requestId}/retry-failed` | `CanCreateRequests`; requires `Idempotency-Key` (header or body) | `LicenseExtensionRetryEndpoints.RetryFailedAsync` → `RetryFailedLicenseExtensionsCommand` |
 
 Retry body (optional filter):
@@ -62,7 +63,7 @@ Returns `201 Created` with new request DTO (`Location` → `/api/v1/license-exte
 
 | Method | Path | Auth | Handler |
 |--------|------|------|---------|
-| `GET` | `/api/v1/entitlements/search?customerId=` | Authenticated | `EntitlementAggregationEndpoints.SearchAsync` → `SearchCustomerEntitlementsQuery` |
+| `GET` | `/api/v1/entitlements/search?customerId=` | `PlatformAdmin` / `DealDeskManager` | `EntitlementAggregationEndpoints.SearchAsync` → `SearchCustomerEntitlementsQuery` |
 
 Aggregates CloudShield + NetworkGuard; partial results when a provider fails.
 
@@ -97,7 +98,7 @@ Endpoint source files: `src/EntitleX.Api/Endpoints/`.
 
 ---
 
-## CloudShield.Api (`:5081`, no JWT)
+## CloudShield.Api (`127.0.0.1:5081`, `X-Api-Key`)
 
 `src/simulators/CloudShield/CloudShield.Api/Endpoints/EntitlementEndpoints.cs`
 
@@ -113,7 +114,7 @@ Demo customer: `CUST-1001`.
 
 ---
 
-## NetworkGuard.Api (`:5082`, no JWT)
+## NetworkGuard.Api (`127.0.0.1:5082`, `X-Api-Key`)
 
 `src/simulators/NetworkGuard/NetworkGuard.Api/Endpoints/LicenseEndpoints.cs`
 
