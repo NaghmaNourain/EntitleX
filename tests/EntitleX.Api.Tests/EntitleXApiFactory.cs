@@ -1,7 +1,10 @@
+using System.Text;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Models;
+using EntitleX.Infrastructure.Identity;
 using EntitleX.Infrastructure.Observability;
 using EntitleX.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -10,6 +13,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
 namespace EntitleX.Api.Tests;
@@ -91,6 +96,30 @@ public sealed class EntitleXApiFactory : WebApplicationFactory<Program>, IAsyncL
             services.RemoveAll<IProviderEntitlementClient>();
             services.AddTransient<IProviderEntitlementClient, StubCloudShieldClient>();
             services.AddTransient<IProviderEntitlementClient, StubNetworkGuardClient>();
+
+            // Force HMAC key onto both IOptions and JwtBearer validation — WAF config
+            // ordering can otherwise mint with one key and validate with Development appsettings.
+            services.PostConfigure<JwtOptions>(options =>
+            {
+                options.Issuer = "EntitleX";
+                options.Audience = "EntitleX";
+                options.SigningKey = SigningKey;
+                options.EnableDevTokenEndpoint = true;
+                options.AllowDevPlatformAdmin = true;
+            });
+
+            services.PostConfigureAll<JwtBearerOptions>(options =>
+            {
+                options.RequireHttpsMetadata = false;
+                options.TokenValidationParameters.ValidIssuer = "EntitleX";
+                options.TokenValidationParameters.ValidAudience = "EntitleX";
+                options.TokenValidationParameters.IssuerSigningKey =
+                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey))
+                    {
+                        KeyId = "entitlex-dev-hmac"
+                    };
+                options.TokenValidationParameters.TryAllIssuerSigningKeys = true;
+            });
         });
     }
 

@@ -73,7 +73,11 @@ public sealed class JwtTokenService : IJwtTokenService
             }
         }
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
+        // IdentityModel 8+ matches HMAC keys by kid; keep a stable KeyId on sign and validate.
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey))
+        {
+            KeyId = JwtHmacKey.KeyId
+        };
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var expires = DateTime.UtcNow.Add(
             lifetime ?? TimeSpan.FromMinutes(_options.AccessTokenLifetimeMinutes));
