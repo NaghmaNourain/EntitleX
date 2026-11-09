@@ -57,6 +57,13 @@ fi
 start "frontend" bash -lc "cd \"$ROOT/frontend\" && npm run dev"
 
 echo ""
-echo "==> Lab Full Stack running. SPA http://localhost:5173  API http://localhost:5080"
+echo "==> Lab Full Stack running"
+echo "    SPA          http://localhost:5173"
+echo "    API          http://localhost:5080"
+echo "    CloudShield  http://127.0.0.1:5081"
+echo "    NetworkGuard http://127.0.0.1:5082"
+echo "    Grafana      http://localhost:3001 (admin/admin)"
+echo "    Jaeger       http://localhost:16686"
+echo "    Prometheus   http://localhost:9090/targets"
 echo "    Stop with Ctrl+C in this Run tool window."
 wait

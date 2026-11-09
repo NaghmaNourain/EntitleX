@@ -28,7 +28,7 @@ Shared configs live in both [`.run/`](../.run/) and [`.idea/runConfigurations/`]
 
 | Piece | Port / role |
 |-------|-------------|
-| Lab Infra (Compose) | Postgres 5432, Keycloak 8080, Kafka 9092, LocalStack 4566, Mailpit, Jaeger, Prometheus, Grafana |
+| Lab Infra (Compose) | Postgres 5432, Keycloak 8080, Kafka 9092, LocalStack 4566, Mailpit, Jaeger, Prometheus, Grafana — script force-recreates obs containers so scrape/Jaeger DS/dashboards match the repo |
 | CloudShield.Api | `127.0.0.1:5081` |
 | NetworkGuard.Api | `127.0.0.1:5082` |
 | EntitleX.Api | `localhost:5080` |

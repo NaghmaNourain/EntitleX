@@ -89,8 +89,7 @@ Simulators use the same OTLP endpoint with their own `ServiceName`.
 
 ## Lab verification
 
-1. `docker compose up -d` (Jaeger, Prometheus, Grafana healthy).
-2. Start **Lab Full Stack** (or API + workers + simulators).
-3. Prometheus → Status → Targets: jobs for api/sims/`9180`–`9184` should scrape (UP when hosts are running).
-4. Hit a control-plane API request; open Jaeger UI and find service `EntitleX.Api` (and linked messaging spans when fulfillment runs).
-5. Grafana `:3001` → dashboard **EntitleX Overview**; Explore → Jaeger datasource.
+1. Prefer **Lab Full Stack** / `scripts/lab-infra-up.sh` — they `docker compose up -d` and **force-recreate** Jaeger/Prometheus/Grafana so `prometheus.yml`, Jaeger datasource, and the overview dashboard always match the checkout.
+2. Prometheus → Status → Targets: jobs for api/sims/`9180`–`9184` should scrape (UP when hosts are running).
+3. Hit a control-plane API request; open Jaeger UI and find service `EntitleX.Api` (and linked messaging spans when fulfillment runs).
+4. Grafana `:3001` → dashboard **EntitleX Overview**; Explore → Jaeger datasource.
