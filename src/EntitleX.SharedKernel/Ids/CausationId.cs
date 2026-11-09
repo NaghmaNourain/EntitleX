@@ -1,4 +1,4 @@
-namespace EntitleX.BuildingBlocks.Ids;
+namespace EntitleX.SharedKernel.Ids;
 
 /// <summary>Identity of the message that caused this one (parent MessageId).</summary>
 public readonly record struct CausationId(Guid Value)

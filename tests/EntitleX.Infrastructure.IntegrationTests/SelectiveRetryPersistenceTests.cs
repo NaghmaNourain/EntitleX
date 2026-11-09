@@ -1,5 +1,5 @@
 using EntitleX.Application.Abstractions;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;
@@ -292,6 +292,15 @@ public sealed class SelectiveRetryPersistenceTests : IAsyncLifetime
             string? correlationId = null,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+
+        public Task DispatchFulfillmentAsync(
+            LicenseExtensionRequest request,
+            LicenseExtensionSaga saga,
+            Guid? correlationId = null,
+            Guid? causationId = null,
+            CancellationToken cancellationToken = default) =>
+            DispatchFulfillmentAsync(request, correlationId, causationId, cancellationToken);
 
         public Task DispatchFulfillmentAsync(
             LicenseExtensionRequest request,

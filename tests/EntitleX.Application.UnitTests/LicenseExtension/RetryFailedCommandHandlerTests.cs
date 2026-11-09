@@ -3,7 +3,7 @@ using EntitleX.Application.Abstractions;
 using EntitleX.Application.Common.Exceptions;
 using EntitleX.Application.LicenseExtension.Retry;
 using EntitleX.Application.LicenseExtension.RetryFailed;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Identity;
 using EntitleX.Domain.LicenseExtension;
@@ -410,6 +410,17 @@ public sealed class RetryFailedCommandHandlerTests
                 _sagas[request.Id.Value] = saga;
             }
 
+            return DispatchFulfillmentAsync(request, saga, correlationId, causationId, cancellationToken);
+        }
+
+        public Task DispatchFulfillmentAsync(
+            LicenseExtensionRequest request,
+            LicenseExtensionSaga saga,
+            Guid? correlationId = null,
+            Guid? causationId = null,
+            CancellationToken cancellationToken = default)
+        {
+            _sagas[request.Id.Value] = saga;
             request.BeginFulfillment();
             saga.QueueFulfillment(request.Items.Select(i => (i.Id, i.EntitlementId, i.LogicalOperationId)));
             Interlocked.Increment(ref _dispatch);

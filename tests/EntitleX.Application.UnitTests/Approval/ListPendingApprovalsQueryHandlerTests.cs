@@ -1,6 +1,6 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Approval.ListPendingApprovals;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Identity;
 

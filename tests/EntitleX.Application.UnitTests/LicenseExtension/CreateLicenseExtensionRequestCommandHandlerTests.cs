@@ -5,13 +5,13 @@ using EntitleX.Application.EntitlementAggregation.Models;
 using EntitleX.Application.Fulfillment;
 using EntitleX.Application.LicenseExtension.CreateLicenseExtensionRequest;
 using EntitleX.Application.Saga;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Identity;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;
+
 using EntitleX.Messaging.Contracts;
-using EntitleX.Messaging.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -182,9 +182,9 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
             requests,
             new FulfillmentOutboxService(
                 outbox,
-                Options.Create(new MessagingOptions
+                Options.Create(new FulfillmentEnqueueOptions
                 {
-                    Sqs = { FulfillmentQueueName = "entitlex-fulfillment" }
+                    FulfillmentQueueName = "entitlex-fulfillment"
                 })),
             new LoggingSagaTimeoutHook(NullLogger<LoggingSagaTimeoutHook>.Instance),
             NullLogger<LicenseExtensionSagaOrchestrator>.Instance);

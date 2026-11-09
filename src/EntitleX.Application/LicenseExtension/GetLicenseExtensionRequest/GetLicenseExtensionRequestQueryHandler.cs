@@ -1,7 +1,7 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Common.Exceptions;
 using EntitleX.Application.LicenseExtension.Models;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using MediatR;
 
 namespace EntitleX.Application.LicenseExtension.GetLicenseExtensionRequest;

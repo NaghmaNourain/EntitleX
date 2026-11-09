@@ -1,6 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\EntitleX.Messaging.Contracts\EntitleX.Messaging.Contracts.csproj" />
     <ProjectReference Include="..\EntitleX.BuildingBlocks\EntitleX.BuildingBlocks.csproj" />
   </ItemGroup>
 

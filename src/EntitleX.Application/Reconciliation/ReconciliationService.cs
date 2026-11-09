@@ -1,6 +1,6 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Reconciliation.Models;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;

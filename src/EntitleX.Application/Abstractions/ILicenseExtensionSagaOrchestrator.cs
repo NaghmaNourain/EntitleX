@@ -1,7 +1,7 @@
-using EntitleX.BuildingBlocks.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;
+using EntitleX.SharedKernel.Ids;
 
 namespace EntitleX.Application.Abstractions;
 
@@ -32,6 +32,18 @@ public interface ILicenseExtensionSagaOrchestrator
 
     Task DispatchFulfillmentAsync(
         LicenseExtensionRequest request,
+        Guid? correlationId = null,
+        Guid? causationId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Dispatch using a saga already started in this unit of work (avoids EF
+    /// re-query of Added-but-unsaved aggregates). Prefer this after
+    /// <see cref="StartForRequestAsync"/>.
+    /// </summary>
+    Task DispatchFulfillmentAsync(
+        LicenseExtensionRequest request,
+        LicenseExtensionSaga saga,
         Guid? correlationId = null,
         Guid? causationId = null,
         CancellationToken cancellationToken = default);

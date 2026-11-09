@@ -1,4 +1,4 @@
-namespace EntitleX.BuildingBlocks.Ids;
+namespace EntitleX.SharedKernel.Ids;
 
 /// <summary>End-to-end correlation identity spanning an operation across services.</summary>
 public readonly record struct CorrelationId(Guid Value)

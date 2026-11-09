@@ -1,4 +1,4 @@
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.LicenseExtension;
 
 namespace EntitleX.Application.Reconciliation.Models;

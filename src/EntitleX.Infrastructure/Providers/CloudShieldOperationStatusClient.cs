@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Reconciliation.Models;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Infrastructure.Observability;
 using Microsoft.Extensions.Logging;

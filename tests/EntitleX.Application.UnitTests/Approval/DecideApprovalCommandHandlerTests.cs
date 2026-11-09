@@ -1,7 +1,7 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Approval.DecideApproval;
 using EntitleX.Application.Common.Exceptions;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Identity;
 using EntitleX.Domain.LicenseExtension;
@@ -220,6 +220,15 @@ public sealed class DecideApprovalCommandHandlerTests
             string reason,
             string? correlationId = null,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+
+        public Task DispatchFulfillmentAsync(
+            LicenseExtensionRequest request,
+            LicenseExtensionSaga saga,
+            Guid? correlationId = null,
+            Guid? causationId = null,
+            CancellationToken cancellationToken = default) =>
+            DispatchFulfillmentAsync(request, correlationId, causationId, cancellationToken);
 
         public Task DispatchFulfillmentAsync(
             LicenseExtensionRequest request,

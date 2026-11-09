@@ -1,7 +1,7 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Approval.Models;
 using EntitleX.Application.Common.Exceptions;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;

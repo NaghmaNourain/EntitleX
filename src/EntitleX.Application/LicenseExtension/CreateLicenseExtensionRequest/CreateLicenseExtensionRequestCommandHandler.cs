@@ -2,7 +2,7 @@ using EntitleX.Application.Abstractions;
 using EntitleX.Application.Common.Exceptions;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Application.LicenseExtension.Models;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Identity;
 using EntitleX.Domain.LicenseExtension;
@@ -114,7 +114,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
 
         ApplyInitialApprovalTransition(aggregate, band);
 
-        _ = await _sagaOrchestrator.StartForRequestAsync(
+        var saga = await _sagaOrchestrator.StartForRequestAsync(
             aggregate,
             band,
             cancellationToken: cancellationToken);
@@ -123,6 +123,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
         {
             await _sagaOrchestrator.DispatchFulfillmentAsync(
                 aggregate,
+                saga,
                 correlationId: null,
                 causationId: null,
                 cancellationToken);

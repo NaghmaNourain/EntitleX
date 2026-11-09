@@ -1,4 +1,4 @@
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Messaging.Abstractions;
 using EntitleX.Messaging.Contracts;
 using EntitleX.Messaging.Kafka;

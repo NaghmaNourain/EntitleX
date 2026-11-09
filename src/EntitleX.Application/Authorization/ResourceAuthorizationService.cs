@@ -1,6 +1,6 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Common.Exceptions;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Identity;
 using EntitleX.Domain.LicenseExtension;
 

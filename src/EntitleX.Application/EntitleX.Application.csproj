@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -8,8 +8,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EntitleX.Domain\EntitleX.Domain.csproj" />
+    <ProjectReference Include="..\EntitleX.SharedKernel\EntitleX.SharedKernel.csproj" />
+    <ProjectReference Include="..\EntitleX.Messaging.Contracts\EntitleX.Messaging.Contracts.csproj" />
     <ProjectReference Include="..\EntitleX.BuildingBlocks\EntitleX.BuildingBlocks.csproj" />
-    <ProjectReference Include="..\EntitleX.Messaging\EntitleX.Messaging.csproj" />
   </ItemGroup>
 
   <ItemGroup>

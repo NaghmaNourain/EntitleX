@@ -19,7 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\simulators\CloudShield\CloudShield.Domain\CloudShield.Domain.csproj" />
-    <ProjectReference Include="..\..\src\EntitleX.BuildingBlocks\EntitleX.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\src\EntitleX.SharedKernel\EntitleX.SharedKernel.csproj" />
   </ItemGroup>
 
 </Project>

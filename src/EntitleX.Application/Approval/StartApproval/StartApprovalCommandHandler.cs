@@ -1,7 +1,7 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Approval.Models;
 using EntitleX.Application.Common.Exceptions;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Identity;
 using EntitleX.Domain.LicenseExtension;
@@ -100,9 +100,9 @@ public sealed class StartApprovalCommandHandler
             request.Reject();
         }
 
-        // Start before dispatch so auto-approve can enqueue fulfillment against the
-        // in-scope saga (not yet SaveChanges'd — see LicenseExtensionSagaOrchestrator).
-        _ = await _sagaOrchestrator.StartForRequestAsync(
+        // Start before dispatch; pass the returned saga so dispatch does not re-query
+        // an Added-but-unsaved aggregate (repository Local is a safety net).
+        var saga = await _sagaOrchestrator.StartForRequestAsync(
             request,
             band,
             command.CorrelationId,
@@ -113,6 +113,7 @@ public sealed class StartApprovalCommandHandler
         {
             await _sagaOrchestrator.DispatchFulfillmentAsync(
                 request,
+                saga,
                 correlationId: null,
                 causationId: null,
                 cancellationToken);

@@ -1,5 +1,5 @@
 using EntitleX.Application.Fulfillment;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Infrastructure.Outbox;
 using EntitleX.Infrastructure.Persistence;
@@ -64,14 +64,18 @@ public sealed class OutboxPersistenceTests : IAsyncLifetime
         aggregate.MarkPendingApproval();
         aggregate.RecordApproval("scope-hash");
 
-        var options = Options.Create(new MessagingOptions
+        var messagingOptions = Options.Create(new MessagingOptions
         {
             Sqs = { FulfillmentQueueName = "entitlex-fulfillment" },
             Outbox = { MaxAttempts = 5 }
         });
+        var enqueueOptions = Options.Create(new FulfillmentEnqueueOptions
+        {
+            FulfillmentQueueName = "entitlex-fulfillment"
+        });
 
-        var writer = new OutboxWriter(db, options);
-        var fulfillment = new FulfillmentOutboxService(writer, options);
+        var writer = new OutboxWriter(db, messagingOptions);
+        var fulfillment = new FulfillmentOutboxService(writer, enqueueOptions);
 
         db.LicenseExtensionRequests.Add(aggregate);
         await fulfillment.EnqueueAfterFinalApprovalAsync(aggregate);

@@ -1,5 +1,5 @@
 using EntitleX.Application.Abstractions;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Common;
@@ -16,13 +16,6 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
     private readonly IFulfillmentOutboxService _fulfillmentOutbox;
     private readonly ISagaTimeoutHook _timeoutHook;
     private readonly ILogger<LicenseExtensionSagaOrchestrator> _logger;
-
-    /// <summary>
-    /// Saga started in this scoped unit of work but not yet flushed by SaveChanges.
-    /// EF Core database queries omit Added entities; create/auto-approve dispatches
-    /// fulfillment in the same request and must use this instance.
-    /// </summary>
-    private LicenseExtensionSaga? _startedInScope;
 
     public LicenseExtensionSagaOrchestrator(
         ILicenseExtensionSagaRepository sagaRepository,
@@ -48,14 +41,12 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         var existing = await _sagaRepository.GetByRequestIdAsync(request.Id, cancellationToken);
         if (existing is not null)
         {
-            _startedInScope = existing;
             return existing;
         }
 
         // Routes Requested → Approved (auto), Pending* (human), or Rejected (unsupported).
         var saga = LicenseExtensionSaga.Start(request.Id, band, correlationId: correlationId);
         await _sagaRepository.AddAsync(saga, cancellationToken);
-        _startedInScope = saga;
         SagaTelemetry.RecordTransition("None", saga.State.ToString());
         return saga;
     }
@@ -115,14 +106,30 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         }
     }
 
-    public async Task DispatchFulfillmentAsync(
+    public Task DispatchFulfillmentAsync(
         LicenseExtensionRequest request,
         Guid? correlationId = null,
         Guid? causationId = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        DispatchFulfillmentCoreAsync(request, saga: null, correlationId, causationId, cancellationToken);
+
+    public Task DispatchFulfillmentAsync(
+        LicenseExtensionRequest request,
+        LicenseExtensionSaga saga,
+        Guid? correlationId = null,
+        Guid? causationId = null,
+        CancellationToken cancellationToken = default) =>
+        DispatchFulfillmentCoreAsync(request, saga, correlationId, causationId, cancellationToken);
+
+    private async Task DispatchFulfillmentCoreAsync(
+        LicenseExtensionRequest request,
+        LicenseExtensionSaga? saga,
+        Guid? correlationId,
+        Guid? causationId,
+        CancellationToken cancellationToken)
     {
         using var activity = SagaTelemetry.StartTransition("dispatch_fulfillment");
-        var saga = await RequireSagaAsync(request.Id, cancellationToken);
+        saga ??= await RequireSagaAsync(request.Id, cancellationToken);
         var from = saga.State.ToString();
 
         if (request.Status != LicenseExtensionRequestStatus.Approved)
@@ -305,13 +312,7 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         RequestId requestId,
         CancellationToken cancellationToken)
     {
-        // Prefer the saga started earlier in this scope — create/auto-approve calls
-        // DispatchFulfillmentAsync before SaveChanges, and EF queries miss Added rows.
-        if (_startedInScope is not null && _startedInScope.RequestId.Equals(requestId))
-        {
-            return _startedInScope;
-        }
-
+        // Repository checks ChangeTracker.Local for Added-but-unsaved sagas.
         return await _sagaRepository.GetByRequestIdAsync(requestId, cancellationToken)
             ?? throw new InvalidOperationException(
                 $"Saga for request '{requestId.Value}' was not found.");
