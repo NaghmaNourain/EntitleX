@@ -258,7 +258,8 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
 
         if (request.Status is not (
             LicenseExtensionRequestStatus.InFulfillment or
-            LicenseExtensionRequestStatus.PartiallyFulfilled))
+            LicenseExtensionRequestStatus.PartiallyFulfilled or
+            LicenseExtensionRequestStatus.Failed))
         {
             return;
         }

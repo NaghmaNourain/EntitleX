@@ -472,7 +472,8 @@ public sealed class ReconciliationService : IReconciliationService
 
         if (request.Status is not (
             LicenseExtensionRequestStatus.InFulfillment or
-            LicenseExtensionRequestStatus.PartiallyFulfilled))
+            LicenseExtensionRequestStatus.PartiallyFulfilled or
+            LicenseExtensionRequestStatus.Failed))
         {
             return Task.CompletedTask;
         }

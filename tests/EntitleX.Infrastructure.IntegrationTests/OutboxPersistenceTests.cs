@@ -99,6 +99,7 @@ public sealed class OutboxPersistenceTests : IAsyncLifetime
 
         Assert.True(first);
         Assert.False(second);
+        await db.SaveChangesAsync();
         Assert.Equal(1, await db.ProcessedMessages.CountAsync());
     }
 

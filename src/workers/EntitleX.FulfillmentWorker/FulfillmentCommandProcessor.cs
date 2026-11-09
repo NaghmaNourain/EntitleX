@@ -8,11 +8,12 @@ using Microsoft.Extensions.Options;
 namespace EntitleX.FulfillmentWorker;
 
 /// <summary>
-/// Turns a fulfillment command into per-item Kafka provider commands
-/// (partition key = entitlement id) and advances the saga to Processing.
+/// Turns a fulfillment command into per-item Kafka provider commands via the
+/// transactional outbox (partition key = entitlement id) and advances the saga
+/// to Processing in the same unit of work as the consumer claim.
 /// </summary>
 public sealed class FulfillmentCommandProcessor(
-    IKafkaMessagePublisher kafka,
+    IOutboxWriter outboxWriter,
     IConsumerIdempotencyStore idempotency,
     ILicenseExtensionSagaOrchestrator sagaOrchestrator,
     IUnitOfWork unitOfWork,
@@ -70,14 +71,16 @@ public sealed class FulfillmentCommandProcessor(
                 logicalOperationId: item.LogicalOperationId);
 
             var topic = ResolveTopic(item.Provider, kafkaOptions);
-            await kafka.PublishAsync(
-                topic,
-                partitionKey: item.EntitlementId,
+            await outboxWriter.EnqueueAsync(
                 child,
+                new OutboxDispatchTarget(
+                    OutboxTransport.Kafka,
+                    topic,
+                    PartitionKey: item.EntitlementId),
                 cancellationToken);
 
             logger.LogInformation(
-                "Published provider command for entitlement {EntitlementId} on {Topic} (logicalOp={LogicalOperationId})",
+                "Enqueued provider command outbox row for entitlement {EntitlementId} on {Topic} (logicalOp={LogicalOperationId})",
                 item.EntitlementId,
                 topic,
                 item.LogicalOperationId);
@@ -87,6 +90,8 @@ public sealed class FulfillmentCommandProcessor(
             RequestId.From(command.RequestId),
             envelope.CorrelationId?.ToString("D"),
             cancellationToken);
+
+        // Single flush: processed_messages claim + outbox Kafka rows + saga Processing.
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 

@@ -15,6 +15,7 @@ namespace NetworkGuard.Infrastructure.Messaging;
 /// <summary>
 /// Consumes NetworkGuard license-extension commands from Kafka, applies them
 /// idempotently, and publishes completion/failure events.
+/// Post-apply transport errors rethrow (no Failed event) so Kafka retries Completed.
 /// </summary>
 public sealed class ProviderCommandConsumer(
     IServiceScopeFactory scopeFactory,
@@ -79,40 +80,15 @@ public sealed class ProviderCommandConsumer(
         using var scope = scopeFactory.CreateScope();
         var applier = scope.ServiceProvider.GetRequiredService<ILicenseExtensionApplier>();
 
+        LicenseOperationDto result;
         try
         {
-            var result = await applier.ApplyAsync(
+            result = await applier.ApplyAsync(
                 command.EntitlementId,
                 new SubmitLicenseExtensionRequest(
                     command.LogicalOperationId,
                     command.AttemptId,
                     command.NewExpiryUtc),
-                cancellationToken);
-
-            var completed = new ProviderLicenseExtensionCompletedV1(
-                command.RequestId,
-                command.RequestItemId,
-                command.EntitlementId,
-                "NetworkGuard",
-                command.LogicalOperationId,
-                command.AttemptId,
-                result.PreviousExpiryUtc,
-                result.NewExpiryUtc,
-                result.AlreadyApplied);
-
-            var resultEnvelope = MessageEnvelope.Create(
-                MessageTypes.ProviderLicenseExtensionCompleted,
-                completed,
-                MessageId.New().Value,
-                correlationId: envelope.CorrelationId,
-                causationId: envelope.MessageId,
-                requestId: command.RequestId,
-                logicalOperationId: command.LogicalOperationId);
-
-            await kafka.PublishAsync(
-                options.Value.Kafka.ProviderResultsTopic,
-                partitionKey: command.EntitlementId,
-                resultEnvelope,
                 cancellationToken);
         }
         catch (Exception ex)
@@ -132,7 +108,7 @@ public sealed class ProviderCommandConsumer(
                 "ApplyFailed",
                 ex.Message);
 
-            var resultEnvelope = MessageEnvelope.Create(
+            var failedEnvelope = MessageEnvelope.Create(
                 MessageTypes.ProviderLicenseExtensionFailed,
                 failed,
                 MessageId.New().Value,
@@ -144,8 +120,35 @@ public sealed class ProviderCommandConsumer(
             await kafka.PublishAsync(
                 options.Value.Kafka.ProviderResultsTopic,
                 partitionKey: command.EntitlementId,
-                resultEnvelope,
+                failedEnvelope,
                 cancellationToken);
+            return;
         }
+
+        var completed = new ProviderLicenseExtensionCompletedV1(
+            command.RequestId,
+            command.RequestItemId,
+            command.EntitlementId,
+            "NetworkGuard",
+            command.LogicalOperationId,
+            command.AttemptId,
+            result.PreviousExpiryUtc,
+            result.NewExpiryUtc,
+            result.AlreadyApplied);
+
+        var resultEnvelope = MessageEnvelope.Create(
+            MessageTypes.ProviderLicenseExtensionCompleted,
+            completed,
+            MessageId.New().Value,
+            correlationId: envelope.CorrelationId,
+            causationId: envelope.MessageId,
+            requestId: command.RequestId,
+            logicalOperationId: command.LogicalOperationId);
+
+        await kafka.PublishAsync(
+            options.Value.Kafka.ProviderResultsTopic,
+            partitionKey: command.EntitlementId,
+            resultEnvelope,
+            cancellationToken);
     }
 }

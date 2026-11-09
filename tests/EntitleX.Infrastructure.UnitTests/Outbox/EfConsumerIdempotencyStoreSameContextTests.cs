@@ -14,6 +14,9 @@ public sealed class EfConsumerIdempotencyStoreSameContextTests
 
         Assert.True(await store.TryBeginAsync("consumer", "msg-1", "FulfillmentCommand"));
         Assert.False(await store.TryBeginAsync("consumer", "msg-1", "FulfillmentCommand"));
+        Assert.Equal(1, db.ProcessedMessages.Local.Count(x => x.ConsumerName == "consumer"));
+
+        await db.SaveChangesAsync();
         Assert.Equal(1, await db.ProcessedMessages.CountAsync());
     }
 

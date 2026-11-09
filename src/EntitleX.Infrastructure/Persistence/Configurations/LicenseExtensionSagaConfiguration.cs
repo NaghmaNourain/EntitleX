@@ -83,6 +83,12 @@ public sealed class LicenseExtensionSagaConfiguration : IEntityTypeConfiguration
             .HasColumnName("updated_at_utc")
             .IsRequired();
 
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("row_version")
+            .IsConcurrencyToken()
+            .HasDefaultValue(0u)
+            .IsRequired();
+
         builder.Navigation(x => x.Transitions)
             .HasField("_transitions")
             .UsePropertyAccessMode(PropertyAccessMode.Field);

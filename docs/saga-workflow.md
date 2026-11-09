@@ -108,6 +108,8 @@ The saga does **not** add a duplicate `InFulfillment` enum value. Instead:
 
 `SagaRequestStatusMap.IsInFulfillmentProjection` encodes this. Coarser request statuses remain the API-facing lifecycle; the saga is the fine-grained orchestrator.
 
+**Authority boundary:** `ApprovalCase` owns human approval stages/decisions. `LicenseExtensionSaga` is the source of truth for fulfillment lifecycle and item outcomes (with `row_version` concurrency). Request status is a same-UoW projection (`SyncRequestFulfillmentAsync` / recon sync), including corrective repair from terminal `Failed` → `PartiallyFulfilled`/`Fulfilled` when reconciliation confirms Applied.
+
 Full projection table (`SagaRequestStatusMap`):
 
 | Saga | Request |

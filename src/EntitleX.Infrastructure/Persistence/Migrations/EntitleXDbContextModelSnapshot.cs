@@ -390,6 +390,13 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("requires_deal_desk");
 
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("row_version");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasMaxLength(64)
