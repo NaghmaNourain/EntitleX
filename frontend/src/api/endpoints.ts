@@ -1,4 +1,4 @@
-import { apiRequest } from './client'
+import { apiRequest, createCorrelationId } from './client'
 import type {
   ApprovalCase,
   CreateLicenseExtensionRequestBody,
@@ -14,6 +14,10 @@ import type {
   RequestInsight,
   SagaDto,
 } from './types'
+
+function createIdempotencyKey(): string {
+  return createCorrelationId()
+}
 
 export const api = {
   mintDevToken(role: EntitleXRole, customerIds?: string[]) {
@@ -32,10 +36,11 @@ export const api = {
     )
   },
 
-  createLicenseExtensionRequest(body: CreateLicenseExtensionRequestBody) {
+  createLicenseExtensionRequest(body: CreateLicenseExtensionRequestBody, idempotencyKey?: string) {
     return apiRequest<LicenseExtensionRequest>('/api/v1/license-extension-requests', {
       method: 'POST',
       body,
+      idempotencyKey: idempotencyKey ?? createIdempotencyKey(),
     })
   },
 
@@ -45,10 +50,10 @@ export const api = {
     })
   },
 
-  startApproval(requestId: string) {
+  startApproval(requestId: string, idempotencyKey?: string) {
     return apiRequest<ApprovalCase>(
       `/api/v1/license-extension-requests/${requestId}/approval/start`,
-      { method: 'POST' },
+      { method: 'POST', idempotencyKey: idempotencyKey ?? createIdempotencyKey() },
     )
   },
 
@@ -59,12 +64,18 @@ export const api = {
     )
   },
 
-  decideApproval(requestId: string, outcome: 'Approved' | 'Rejected', comment?: string) {
+  decideApproval(
+    requestId: string,
+    outcome: 'Approved' | 'Rejected',
+    comment?: string,
+    idempotencyKey?: string,
+  ) {
     return apiRequest<ApprovalCase>(
       `/api/v1/license-extension-requests/${requestId}/approval/decisions`,
       {
         method: 'POST',
         body: { outcome, comment },
+        idempotencyKey: idempotencyKey ?? createIdempotencyKey(),
       },
     )
   },
