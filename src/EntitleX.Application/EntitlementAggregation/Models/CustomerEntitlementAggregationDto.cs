@@ -9,4 +9,7 @@ public sealed record CustomerEntitlementAggregationDto(
     string CorrelationId,
     IReadOnlyList<NormalizedEntitlementDto> Entitlements,
     IReadOnlyList<ProviderContributionDto> Providers,
-    bool IsPartial);
+    bool IsPartial,
+    int Page = 1,
+    int PageSize = 100,
+    int TotalCount = 0);

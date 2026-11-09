@@ -117,16 +117,16 @@ module "alb" {
 }
 
 module "rds" {
-  source                = "./modules/rds"
-  name_prefix           = var.name_prefix
-  environment           = var.environment
-  vpc_id                = module.vpc.vpc_id
-  subnet_ids            = module.vpc.private_subnet_ids
-  ecs_security_group_id = aws_security_group.app.id
-  instance_class           = var.rds_instance_class
-  allocated_storage_gb     = var.rds_allocated_storage_gb
-  multi_az                 = var.rds_multi_az
-  backup_retention_period  = var.rds_backup_retention_period
+  source                  = "./modules/rds"
+  name_prefix             = var.name_prefix
+  environment             = var.environment
+  vpc_id                  = module.vpc.vpc_id
+  subnet_ids              = module.vpc.private_subnet_ids
+  ecs_security_group_id   = aws_security_group.app.id
+  instance_class          = var.rds_instance_class
+  allocated_storage_gb    = var.rds_allocated_storage_gb
+  multi_az                = var.rds_multi_az
+  backup_retention_period = var.rds_backup_retention_period
 }
 
 module "sqs" {

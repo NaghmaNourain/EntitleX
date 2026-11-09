@@ -19,7 +19,7 @@ public sealed class SearchCustomerEntitlementsQueryHandler
         _authorization = authorization;
     }
 
-    public Task<CustomerEntitlementAggregationDto> Handle(
+    public async Task<CustomerEntitlementAggregationDto> Handle(
         SearchCustomerEntitlementsQuery request,
         CancellationToken cancellationToken)
     {
@@ -30,9 +30,35 @@ public sealed class SearchCustomerEntitlementsQueryHandler
             ? Guid.NewGuid().ToString("N")
             : request.CorrelationId.Trim();
 
-        return _aggregation.AggregateForCustomerAsync(
+        var aggregated = await _aggregation.AggregateForCustomerAsync(
             customerId,
             correlationId,
             cancellationToken);
+
+        var totalCount = aggregated.Entitlements.Count;
+
+        // PageSize <= 0 means "return all" (backward-compatible unpaged search).
+        if (request.PageSize <= 0)
+        {
+            return aggregated with
+            {
+                Page = 1,
+                PageSize = totalCount == 0 ? 50 : totalCount,
+                TotalCount = totalCount
+            };
+        }
+
+        var page = request.Page < 1 ? 1 : request.Page;
+        var pageSize = Math.Clamp(request.PageSize, 1, 100);
+        var skip = (page - 1) * pageSize;
+        var pageItems = aggregated.Entitlements.Skip(skip).Take(pageSize).ToList();
+
+        return aggregated with
+        {
+            Entitlements = pageItems,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
     }
 }

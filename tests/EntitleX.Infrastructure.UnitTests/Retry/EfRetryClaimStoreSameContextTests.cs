@@ -1,3 +1,4 @@
+using EntitleX.Domain.LicenseExtension;
 using EntitleX.SharedKernel.Ids;
 using EntitleX.Infrastructure.Persistence;
 using EntitleX.Infrastructure.Retry;
@@ -24,6 +25,50 @@ public sealed class EfRetryClaimStoreSameContextTests
 
         await db.SaveChangesAsync();
         Assert.Equal(1, await db.RetryItemClaims.CountAsync());
+    }
+
+    [Fact]
+    public async Task Reclaim_after_terminal_failed_child_same_context_succeeds()
+    {
+        await using var db = CreateDb();
+        var store = new EfRetryClaimStore(db);
+        var sourceId = RequestId.New();
+        var logical = LogicalOperationId.New();
+        var firstRetry = await SeedFailedRequestAsync(db);
+
+        Assert.Equal(LicenseExtensionRequestStatus.Failed,
+            (await db.LicenseExtensionRequests.SingleAsync(r => r.Id == firstRetry)).Status);
+
+        Assert.True(
+            await store.TryClaimItemsAsync(sourceId, firstRetry, "key-1", [logical], notes: null),
+            "initial claim against a Failed child should succeed");
+        await db.SaveChangesAsync();
+
+        var secondRetry = RequestId.New();
+        Assert.True(
+            await store.TryClaimItemsAsync(sourceId, secondRetry, "key-2", [logical], notes: null),
+            "reclaim after terminal Failed release must succeed in the same DbContext");
+        await db.SaveChangesAsync();
+
+        Assert.Equal(1, await db.RetryItemClaims.CountAsync());
+        Assert.Equal(secondRetry, (await db.RetryItemClaims.SingleAsync()).RetryRequestId);
+    }
+
+    private static async Task<RequestId> SeedFailedRequestAsync(EntitleXDbContext db)
+    {
+        var baseline = DateTimeOffset.Parse("2026-06-01T00:00:00Z");
+        var request = LicenseExtensionRequest.CreateFresh(
+            $"EXT-{Guid.NewGuid():N}"[..20],
+            "rep@entitlex.local",
+            [(EntitlementId.From("ent-x"), ProviderSystem.CloudShield, baseline, baseline.AddDays(5))]);
+        request.Submit();
+        request.MarkPendingApproval();
+        request.RecordApproval("hash");
+        request.BeginFulfillment();
+        request.CompleteFulfillment(0, 1);
+        db.LicenseExtensionRequests.Add(request);
+        await db.SaveChangesAsync();
+        return request.Id;
     }
 
     private static EntitleXDbContext CreateDb()

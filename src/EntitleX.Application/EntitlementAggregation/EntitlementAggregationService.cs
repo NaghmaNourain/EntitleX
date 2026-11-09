@@ -61,7 +61,10 @@ public sealed class EntitlementAggregationService : IEntitlementAggregationServi
             correlationId,
             entitlements,
             providerDtos,
-            isPartial);
+            isPartial,
+            Page: 1,
+            PageSize: entitlements.Count == 0 ? 100 : entitlements.Count,
+            TotalCount: entitlements.Count);
     }
 
     private async Task<ProviderResult> QueryProviderAsync(

@@ -7,7 +7,9 @@ public sealed record ListPendingApprovalsQuery(
     int Take = 50,
     int Skip = 0,
     DateTimeOffset? AfterCreatedAtUtc = null,
-    Guid? AfterApprovalCaseId = null) : IRequest<PendingApprovalsPageDto>;
+    Guid? AfterApprovalCaseId = null,
+    int Page = 1,
+    int PageSize = 50) : IRequest<PendingApprovalsPageDto>;
 
 public sealed record PendingApprovalsPageDto(
     int Total,
@@ -15,7 +17,10 @@ public sealed record PendingApprovalsPageDto(
     int Take,
     IReadOnlyList<PendingApprovalSummaryDto> Items,
     DateTimeOffset? NextCreatedAtUtc = null,
-    Guid? NextApprovalCaseId = null);
+    Guid? NextApprovalCaseId = null,
+    int Page = 1,
+    int PageSize = 50,
+    int TotalCount = 0);
 
 public sealed record PendingApprovalSummaryDto(
     Guid ApprovalCaseId,

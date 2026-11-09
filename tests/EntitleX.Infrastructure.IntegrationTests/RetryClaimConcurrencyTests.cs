@@ -2,40 +2,32 @@ using EntitleX.SharedKernel.Ids;
 using EntitleX.Infrastructure.Persistence;
 using EntitleX.Infrastructure.Retry;
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.PostgreSql;
 
 namespace EntitleX.Infrastructure.IntegrationTests;
 
 /// <summary>
 /// Dual concurrent claim attempts against real Postgres unique indexes.
-/// Skips automatically when Docker is unavailable.
+/// Skips automatically when Postgres is unavailable.
 /// </summary>
 public sealed class RetryClaimConcurrencyTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _container;
+    private TestPostgresLease? _postgres;
 
     public async Task InitializeAsync()
     {
-        if (!DockerAvailability.IsAvailable)
+        if (!TestPostgres.IsConfigured)
         {
             return;
         }
 
-        _container = new PostgreSqlBuilder()
-            .WithImage("postgres:16-alpine")
-            .WithDatabase("entitlex_platform")
-            .WithUsername("entitlex")
-            .WithPassword("entitlex")
-            .Build();
-
-        await _container.StartAsync();
+        _postgres = await TestPostgres.AcquireAsync();
     }
 
     public async Task DisposeAsync()
     {
-        if (_container is not null)
+        if (_postgres is not null)
         {
-            await _container.DisposeAsync();
+            await _postgres.DisposeAsync();
         }
     }
 
@@ -91,8 +83,13 @@ public sealed class RetryClaimConcurrencyTests : IAsyncLifetime
 
     private EntitleXDbContext CreateDbContext()
     {
+        Assert.NotNull(_postgres);
+
         var options = new DbContextOptionsBuilder<EntitleXDbContext>()
-            .UseNpgsql(_container!.GetConnectionString())
+            .UseNpgsql(_postgres.ConnectionString, npgsql =>
+            {
+                npgsql.MigrationsAssembly(typeof(EntitleXDbContext).Assembly.FullName);
+            })
             .Options;
         return new EntitleXDbContext(options);
     }

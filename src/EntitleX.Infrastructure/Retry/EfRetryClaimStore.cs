@@ -64,19 +64,15 @@ public sealed class EfRetryClaimStore : IRetryClaimStore
             distinct,
             cancellationToken);
 
-        var existingClaims = await _db.RetryItemClaims
-            .AsNoTracking()
-            .Where(x => x.SourceRequestId == sourceRequestId)
-            .Select(x => new { x.LogicalOperationId, x.RetryRequestId })
-            .ToListAsync(cancellationToken);
+        // Derive the active set from the change tracker. ReleaseClaims loads every
+        // claim for this source; AsNoTracking would still see Deleted rows that
+        // have not been flushed yet and incorrectly block reclaim.
+        await EnsureSourceClaimsTrackedAsync(sourceRequestId, cancellationToken);
 
-        var activeClaimedIds = existingClaims
-            .Select(x => x.LogicalOperationId)
-            .Concat(
-                _db.RetryItemClaims.Local
-                    .Where(x => x.SourceRequestId == sourceRequestId
-                        && _db.Entry(x).State != EntityState.Deleted)
-                    .Select(x => x.LogicalOperationId))
+        var activeClaimedIds = _db.ChangeTracker.Entries<RetryItemClaim>()
+            .Where(e => e.Entity.SourceRequestId.Equals(sourceRequestId)
+                        && e.State is not EntityState.Deleted)
+            .Select(e => e.Entity.LogicalOperationId)
             .ToHashSet();
 
         if (distinct.Any(activeClaimedIds.Contains))
@@ -117,12 +113,13 @@ public sealed class EfRetryClaimStore : IRetryClaimStore
         IReadOnlyList<LogicalOperationId> logicalOperationIds,
         CancellationToken cancellationToken)
     {
-        var claims = await _db.RetryItemClaims
-            .Where(x => x.SourceRequestId == sourceRequestId)
-            .ToListAsync(cancellationToken);
+        await EnsureSourceClaimsTrackedAsync(sourceRequestId, cancellationToken);
 
-        var relevant = claims
-            .Where(c => logicalOperationIds.Any(l => l.Equals(c.LogicalOperationId)))
+        var relevant = _db.ChangeTracker.Entries<RetryItemClaim>()
+            .Where(e => e.State is not EntityState.Deleted
+                        && e.Entity.SourceRequestId.Equals(sourceRequestId)
+                        && logicalOperationIds.Any(l => l.Equals(e.Entity.LogicalOperationId)))
+            .Select(e => e.Entity)
             .ToList();
 
         if (relevant.Count == 0)
@@ -131,27 +128,83 @@ public sealed class EfRetryClaimStore : IRetryClaimStore
         }
 
         var retryIds = relevant.Select(c => c.RetryRequestId).Distinct().ToList();
-        var terminalStatuses = new[]
-        {
-            LicenseExtensionRequestStatus.Failed,
-            LicenseExtensionRequestStatus.Rejected
-        };
-
-        var terminalRetryIds = await _db.LicenseExtensionRequests
-            .AsNoTracking()
-            .Where(r => retryIds.Contains(r.Id) && terminalStatuses.Contains(r.Status))
-            .Select(r => r.Id)
-            .ToListAsync(cancellationToken);
-
-        if (terminalRetryIds.Count == 0)
+        var terminalSet = await ResolveTerminalRetryIdsAsync(retryIds, cancellationToken);
+        if (terminalSet.Count == 0)
         {
             return;
         }
 
-        var terminalSet = terminalRetryIds.ToHashSet();
         foreach (var claim in relevant.Where(c => terminalSet.Contains(c.RetryRequestId)))
         {
             _db.RetryItemClaims.Remove(claim);
         }
     }
+
+    private async Task EnsureSourceClaimsTrackedAsync(
+        RequestId sourceRequestId,
+        CancellationToken cancellationToken)
+    {
+        var alreadyTracked = _db.ChangeTracker.Entries<RetryItemClaim>()
+            .Any(e => e.Entity.SourceRequestId.Equals(sourceRequestId));
+        if (alreadyTracked)
+        {
+            return;
+        }
+
+        await _db.RetryItemClaims
+            .Where(x => x.SourceRequestId == sourceRequestId)
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<HashSet<RequestId>> ResolveTerminalRetryIdsAsync(
+        IReadOnlyList<RequestId> retryIds,
+        CancellationToken cancellationToken)
+    {
+        var terminal = new HashSet<RequestId>();
+        var unresolved = new List<RequestId>();
+
+        foreach (var retryId in retryIds)
+        {
+            var tracked = _db.LicenseExtensionRequests.Local
+                .FirstOrDefault(r => r.Id.Equals(retryId));
+            if (tracked is not null)
+            {
+                if (IsTerminalFailure(tracked.Status))
+                {
+                    terminal.Add(retryId);
+                }
+
+                continue;
+            }
+
+            unresolved.Add(retryId);
+        }
+
+        if (unresolved.Count == 0)
+        {
+            return terminal;
+        }
+
+        // Status-filtered query + in-memory Id match — avoids flaky value-object
+        // Contains/PK translation on EF InMemory.
+        var candidates = await _db.LicenseExtensionRequests
+            .AsNoTracking()
+            .Where(r => r.Status == LicenseExtensionRequestStatus.Failed
+                        || r.Status == LicenseExtensionRequestStatus.Rejected)
+            .ToListAsync(cancellationToken);
+
+        foreach (var retryId in unresolved)
+        {
+            if (candidates.Any(r => r.Id.Equals(retryId)))
+            {
+                terminal.Add(retryId);
+            }
+        }
+
+        return terminal;
+    }
+
+    private static bool IsTerminalFailure(LicenseExtensionRequestStatus status) =>
+        status is LicenseExtensionRequestStatus.Failed
+            or LicenseExtensionRequestStatus.Rejected;
 }

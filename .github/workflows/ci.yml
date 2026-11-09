@@ -12,6 +12,24 @@ jobs:
   build-test:
     name: Restore, build, unit + integration tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: entitlex
+          POSTGRES_PASSWORD: entitlex
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U entitlex -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Prefer the GHA Postgres service over Testcontainers (nested Docker is unreliable here).
+      ENTITLEX_TEST_POSTGRES: Host=localhost;Port=5432;Username=entitlex;Password=entitlex;Database=postgres
+      CLOUDSHIELD_TEST_POSTGRES: Host=localhost;Port=5432;Username=entitlex;Password=entitlex;Database=postgres
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,16 +47,58 @@ jobs:
 
       - name: Unit tests
         run: |
-          dotnet test tests/EntitleX.Domain.UnitTests/EntitleX.Domain.UnitTests.csproj --configuration Release --no-build --verbosity normal
-          dotnet test tests/EntitleX.Application.UnitTests/EntitleX.Application.UnitTests.csproj --configuration Release --no-build --verbosity normal
-          dotnet test tests/EntitleX.Infrastructure.UnitTests/EntitleX.Infrastructure.UnitTests.csproj --configuration Release --no-build --verbosity normal
-          dotnet test tests/CloudShield.Domain.UnitTests/CloudShield.Domain.UnitTests.csproj --configuration Release --no-build --verbosity normal
+          set -euo pipefail
+          run_tests() {
+            local project="$1"
+            local title="$2"
+            local log
+            log="$(mktemp)"
+            set +e
+            dotnet test "$project" --configuration Release --no-build --verbosity normal | tee "$log"
+            local ec=${PIPESTATUS[0]}
+            set -e
+            if [ "$ec" -ne 0 ]; then
+              echo "::group::Failing test excerpts ($project)"
+              grep -E '\[FAIL\]|Failed |Error Message:|Assert\.|Exception:|System\.[A-Za-z]+Exception|Npgsql\.|Serilog|logger is already frozen' "$log" | tail -n 80 \
+                | while IFS= read -r line; do
+                    echo "::error title=${title}::${line}"
+                  done || true
+              echo "::endgroup::"
+              exit "$ec"
+            fi
+          }
+          run_tests tests/EntitleX.Domain.UnitTests/EntitleX.Domain.UnitTests.csproj "Unit test failure"
+          run_tests tests/EntitleX.Application.UnitTests/EntitleX.Application.UnitTests.csproj "Unit test failure"
+          run_tests tests/EntitleX.Infrastructure.UnitTests/EntitleX.Infrastructure.UnitTests.csproj "Unit test failure"
+          run_tests tests/CloudShield.Domain.UnitTests/CloudShield.Domain.UnitTests.csproj "Unit test failure"
 
       - name: Integration tests
-        # Testcontainers tests skip gracefully via DockerFact when Docker is unavailable.
+        # Uses GHA postgres service via ENTITLEX_TEST_POSTGRES / CLOUDSHIELD_TEST_POSTGRES.
+        # DockerFact skips cleanly when those env vars are absent (no Testcontainers under CI).
+        # On failure, emit compact annotations including failing test names.
         run: |
-          dotnet test tests/EntitleX.Infrastructure.IntegrationTests/EntitleX.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
-          dotnet test tests/CloudShield.Infrastructure.IntegrationTests/CloudShield.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
+          set -euo pipefail
+          run_tests() {
+            local project="$1"
+            local log
+            log="$(mktemp)"
+            set +e
+            dotnet test "$project" --configuration Release --no-build --verbosity normal | tee "$log"
+            local ec=${PIPESTATUS[0]}
+            set -e
+            if [ "$ec" -ne 0 ]; then
+              echo "::group::Failing test excerpts ($project)"
+              grep -E '\[FAIL\]|Failed |Error Message:|Stack Trace:|Assert\.|Exception:|System\.[A-Za-z]+Exception|Npgsql\.|Serilog|logger is already frozen|Failed to connect|Connection refused' "$log" | tail -n 120 \
+                | while IFS= read -r line; do
+                    echo "::error title=Integration test failure::${line}"
+                  done || true
+              echo "::endgroup::"
+              exit "$ec"
+            fi
+          }
+          run_tests tests/EntitleX.Infrastructure.IntegrationTests/EntitleX.Infrastructure.IntegrationTests.csproj
+          run_tests tests/CloudShield.Infrastructure.IntegrationTests/CloudShield.Infrastructure.IntegrationTests.csproj
+          run_tests tests/EntitleX.Api.Tests/EntitleX.Api.Tests.csproj
 
       - name: E2E scaffolding tests
         # Large 1000-item scenario skips without ENTITLEX_E2E=1 + Compose infra.
@@ -74,7 +134,11 @@ jobs:
           terraform_version: 1.5.7
       - name: terraform fmt
         working-directory: infra/terraform
-        run: terraform fmt -check -recursive
+        run: |
+          if ! terraform fmt -check -recursive -diff; then
+            echo "::error::terraform fmt -check failed; run 'terraform fmt -recursive' under infra/terraform"
+            exit 1
+          fi
 
   frontend:
     name: Frontend build

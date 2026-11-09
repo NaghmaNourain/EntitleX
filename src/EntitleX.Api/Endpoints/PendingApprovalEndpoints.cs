@@ -1,3 +1,4 @@
+using EntitleX.Api.Infrastructure;
 using EntitleX.Application.Approval.ListPendingApprovals;
 using EntitleX.Infrastructure.Identity;
 using MediatR;
@@ -24,20 +25,26 @@ public static class PendingApprovalEndpoints
 
     private static async Task<IResult> ListPendingAsync(
         [FromQuery] string? role,
-        [FromQuery] int take,
-        [FromQuery] int skip,
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        [FromQuery] int? take,
+        [FromQuery] int? skip,
         [FromQuery] DateTimeOffset? afterCreatedAtUtc,
         [FromQuery] Guid? afterApprovalCaseId,
         ISender sender,
         CancellationToken cancellationToken)
     {
+        var paging = Pagination.Normalize(page, pageSize, take, skip);
+
         var result = await sender.Send(
             new ListPendingApprovalsQuery(
                 role,
-                take <= 0 ? 50 : take,
-                skip < 0 ? 0 : skip,
+                paging.PageSize,
+                paging.Skip,
                 afterCreatedAtUtc,
-                afterApprovalCaseId),
+                afterApprovalCaseId,
+                paging.Page,
+                paging.PageSize),
             cancellationToken);
         return Results.Ok(result);
     }
