@@ -170,3 +170,4 @@ Questions and expected talking points grounded in the Phase 1–12 codebase. Pre
 - [reconciliation.md](reconciliation.md)
 - [failure-scenarios.md](failure-scenarios.md)
 - [adr/0001-modular-api-vs-microservices.md](adr/0001-modular-api-vs-microservices.md)
+- [guides/README.md](guides/README.md) — EntitleX-grounded educational guides (collections → security)
