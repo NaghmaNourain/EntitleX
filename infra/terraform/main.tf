@@ -123,9 +123,10 @@ module "rds" {
   vpc_id                = module.vpc.vpc_id
   subnet_ids            = module.vpc.private_subnet_ids
   ecs_security_group_id = aws_security_group.app.id
-  instance_class        = var.rds_instance_class
-  allocated_storage_gb  = var.rds_allocated_storage_gb
-  multi_az              = var.rds_multi_az
+  instance_class           = var.rds_instance_class
+  allocated_storage_gb     = var.rds_allocated_storage_gb
+  multi_az                 = var.rds_multi_az
+  backup_retention_period  = var.rds_backup_retention_period
 }
 
 module "sqs" {

@@ -71,7 +71,7 @@ resource "aws_db_instance" "this" {
   # Application creates entitlex_platform / cloudshield / networkguard databases via migration/init.
   db_name = "postgres"
 
-  backup_retention_period = 7
+  backup_retention_period = var.backup_retention_period
   skip_final_snapshot     = var.environment == "lab"
   deletion_protection     = var.environment != "lab"
   apply_immediately       = var.environment == "lab"

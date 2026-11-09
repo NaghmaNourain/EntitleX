@@ -59,9 +59,15 @@ variable "rds_allocated_storage_gb" {
 }
 
 variable "rds_multi_az" {
-  description = "Enable Multi-AZ for RDS (higher cost)."
+  description = "Enable Multi-AZ for RDS (higher cost). Keep false for lab."
   type        = bool
   default     = false
+}
+
+variable "rds_backup_retention_period" {
+  description = "RDS automated backup retention days."
+  type        = number
+  default     = 7
 }
 
 variable "ecs_desired_count_api" {
