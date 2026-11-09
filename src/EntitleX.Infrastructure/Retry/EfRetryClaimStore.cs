@@ -139,25 +139,28 @@ public sealed class EfRetryClaimStore : IRetryClaimStore
             return;
         }
 
-        var retryIds = relevant.Select(c => c.RetryRequestId).Distinct().ToList();
-        var terminalStatuses = new[]
+        // Avoid EF `Contains` over value-object lists (InMemory/providers translate poorly).
+        var terminalSet = new HashSet<RequestId>();
+        foreach (var retryId in relevant.Select(c => c.RetryRequestId).Distinct())
         {
-            LicenseExtensionRequestStatus.Failed,
-            LicenseExtensionRequestStatus.Rejected
-        };
+            var status = await _db.LicenseExtensionRequests
+                .AsNoTracking()
+                .Where(r => r.Id == retryId)
+                .Select(r => (LicenseExtensionRequestStatus?)r.Status)
+                .FirstOrDefaultAsync(cancellationToken);
 
-        var terminalRetryIds = await _db.LicenseExtensionRequests
-            .AsNoTracking()
-            .Where(r => retryIds.Contains(r.Id) && terminalStatuses.Contains(r.Status))
-            .Select(r => r.Id)
-            .ToListAsync(cancellationToken);
+            if (status is LicenseExtensionRequestStatus.Failed
+                or LicenseExtensionRequestStatus.Rejected)
+            {
+                terminalSet.Add(retryId);
+            }
+        }
 
-        if (terminalRetryIds.Count == 0)
+        if (terminalSet.Count == 0)
         {
             return;
         }
 
-        var terminalSet = terminalRetryIds.ToHashSet();
         foreach (var claim in relevant.Where(c => terminalSet.Contains(c.RetryRequestId)))
         {
             _db.RetryItemClaims.Remove(claim);

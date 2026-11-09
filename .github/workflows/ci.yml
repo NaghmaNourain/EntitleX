@@ -29,10 +29,30 @@ jobs:
 
       - name: Unit tests
         run: |
-          dotnet test tests/EntitleX.Domain.UnitTests/EntitleX.Domain.UnitTests.csproj --configuration Release --no-build --verbosity normal
-          dotnet test tests/EntitleX.Application.UnitTests/EntitleX.Application.UnitTests.csproj --configuration Release --no-build --verbosity normal
-          dotnet test tests/EntitleX.Infrastructure.UnitTests/EntitleX.Infrastructure.UnitTests.csproj --configuration Release --no-build --verbosity normal
-          dotnet test tests/CloudShield.Domain.UnitTests/CloudShield.Domain.UnitTests.csproj --configuration Release --no-build --verbosity normal
+          set -euo pipefail
+          run_tests() {
+            local project="$1"
+            local title="$2"
+            local log
+            log="$(mktemp)"
+            set +e
+            dotnet test "$project" --configuration Release --no-build --verbosity normal | tee "$log"
+            local ec=${PIPESTATUS[0]}
+            set -e
+            if [ "$ec" -ne 0 ]; then
+              echo "::group::Failing test excerpts ($project)"
+              grep -E '\[FAIL\]|Failed |Error Message:|Assert\.|Exception:|System\.[A-Za-z]+Exception' "$log" | tail -n 40 \
+                | while IFS= read -r line; do
+                    echo "::error title=${title}::${line}"
+                  done || true
+              echo "::endgroup::"
+              exit "$ec"
+            fi
+          }
+          run_tests tests/EntitleX.Domain.UnitTests/EntitleX.Domain.UnitTests.csproj "Unit test failure"
+          run_tests tests/EntitleX.Application.UnitTests/EntitleX.Application.UnitTests.csproj "Unit test failure"
+          run_tests tests/EntitleX.Infrastructure.UnitTests/EntitleX.Infrastructure.UnitTests.csproj "Unit test failure"
+          run_tests tests/CloudShield.Domain.UnitTests/CloudShield.Domain.UnitTests.csproj "Unit test failure"
 
       - name: Integration tests
         # Testcontainers tests skip gracefully via DockerFact when Docker is unavailable.
