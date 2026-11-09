@@ -36,13 +36,18 @@ public sealed class EfRetryClaimStoreSameContextTests
         var logical = LogicalOperationId.New();
         var firstRetry = await SeedFailedRequestAsync(db);
 
-        Assert.True(await store.TryClaimItemsAsync(
-            sourceId, firstRetry, "key-1", [logical], notes: null));
+        Assert.Equal(LicenseExtensionRequestStatus.Failed,
+            (await db.LicenseExtensionRequests.SingleAsync(r => r.Id == firstRetry)).Status);
+
+        Assert.True(
+            await store.TryClaimItemsAsync(sourceId, firstRetry, "key-1", [logical], notes: null),
+            "initial claim against a Failed child should succeed");
         await db.SaveChangesAsync();
 
         var secondRetry = RequestId.New();
-        Assert.True(await store.TryClaimItemsAsync(
-            sourceId, secondRetry, "key-2", [logical], notes: null));
+        Assert.True(
+            await store.TryClaimItemsAsync(sourceId, secondRetry, "key-2", [logical], notes: null),
+            "reclaim after terminal Failed release must succeed in the same DbContext");
         await db.SaveChangesAsync();
 
         Assert.Equal(1, await db.RetryItemClaims.CountAsync());
