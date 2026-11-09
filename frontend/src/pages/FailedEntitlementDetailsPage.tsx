@@ -11,15 +11,18 @@ import Typography from '@mui/material/Typography'
 import { useQuery } from '@tanstack/react-query'
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/endpoints'
+import { useAuth } from '../auth/AuthContext'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { LoadingState } from '../components/LoadingState'
 import { PageHeader } from '../components/PageHeader'
 import { RequestIdField } from '../components/RequestIdField'
+import { RequestInsightPanel } from '../components/RequestInsightPanel'
 import { StatusChip } from '../components/StatusChip'
 
 export function FailedEntitlementDetailsPage() {
   const { requestId = '' } = useParams()
   const navigate = useNavigate()
+  const { hasRole } = useAuth()
 
   const requestQuery = useQuery({
     queryKey: ['request', requestId],
@@ -55,6 +58,17 @@ export function FailedEntitlementDetailsPage() {
       {(requestQuery.isLoading || sagaQuery.isLoading) && <LoadingState />}
       <ErrorAlert error={requestQuery.error} />
       <ErrorAlert error={sagaQuery.error} />
+
+      {requestId && hasRole('PlatformAdmin') && (
+        <Stack sx={{ mb: 2 }}>
+          <RequestInsightPanel
+            requestId={requestId}
+            mode="rca"
+            title="Reconciliation RCA"
+            buttonLabel="Run RCA"
+          />
+        </Stack>
+      )}
 
       {sagaQuery.data && failed.length === 0 && (
         <Alert severity="success">No failed or uncertain items on this request.</Alert>

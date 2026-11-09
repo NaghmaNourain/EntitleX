@@ -3,8 +3,10 @@ using EntitleX.Application.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Application.Notifications;
 using EntitleX.Application.Fulfillment;
+using EntitleX.Application.Insights.Abstractions;
 using EntitleX.Infrastructure.Audit;
 using EntitleX.Infrastructure.Identity;
+using EntitleX.Infrastructure.Insights;
 using EntitleX.Infrastructure.Notifications;
 using EntitleX.Infrastructure.Outbox;
 using EntitleX.Infrastructure.Persistence;
@@ -41,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<ILicenseExtensionSagaRepository, LicenseExtensionSagaRepository>();
         services.AddScoped<IOutboxWriter, OutboxWriter>();
         services.AddScoped<IOutboxPoisonReplayStore, EfOutboxPoisonReplayStore>();
+        services.AddScoped<IOutboxInsightStore, EfOutboxInsightStore>();
         services.AddScoped<OutboxClaimer>();
         services.AddScoped<OutboxPublisherService>();
         services.AddScoped<IConsumerIdempotencyStore, EfConsumerIdempotencyStore>();
@@ -58,6 +61,7 @@ public static class DependencyInjection
         services.AddHostedService<Observability.SqsDepthProbeHostedService>();
 
         services.AddProviderHttpClients(configuration);
+        services.AddAiAssist(configuration);
 
         services.AddTransient<IProviderEntitlementClient, CloudShieldEntitlementClient>();
         services.AddTransient<IProviderEntitlementClient, NetworkGuardEntitlementClient>();
@@ -230,6 +234,40 @@ public static class DependencyInjection
             configuration.GetSection(ExpirationNotificationOptions.SectionName));
         services.AddScoped<IApprovalReminderService, ApprovalReminderService>();
         services.AddScoped<IExpirationNotificationService, ExpirationNotificationService>();
+        return services;
+    }
+
+    private static IServiceCollection AddAiAssist(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<AiAssistOptions>(configuration.GetSection(AiAssistOptions.SectionName));
+        services.PostConfigure<AiAssistOptions>(options =>
+        {
+            var envKey = Environment.GetEnvironmentVariable("ENTITLEX_AI_API_KEY");
+            if (!string.IsNullOrWhiteSpace(envKey))
+            {
+                options.ApiKey = envKey;
+            }
+        });
+
+        services.AddHttpClient(OpenAiCompatibleCompletionClient.HttpClientName, (sp, client) =>
+        {
+            var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AiAssistOptions>>().Value;
+            var baseUrl = string.IsNullOrWhiteSpace(options.BaseUrl)
+                ? "http://127.0.0.1:11434/v1"
+                : options.BaseUrl.TrimEnd('/') + "/";
+            client.BaseAddress = new Uri(baseUrl);
+            client.Timeout = TimeSpan.FromSeconds(
+                options.TimeoutSeconds <= 0 ? 30 : options.TimeoutSeconds);
+            if (!string.IsNullOrWhiteSpace(options.ApiKey))
+            {
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", options.ApiKey);
+            }
+        });
+
+        services.AddSingleton<IAiCompletionPort, OpenAiCompatibleCompletionClient>();
         return services;
     }
 

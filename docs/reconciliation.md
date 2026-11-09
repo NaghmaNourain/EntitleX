@@ -99,6 +99,17 @@ Table `audit_events` (migration `ReconciliationAudit`) records:
 | `Reconciliation.MismatchDetected` | Local↔provider disagreement |
 | `Reconciliation.BatchCompleted` | Pass finished |
 
+## Request insights (Explain + RCA)
+
+Read-only operator helpers (no writes; Manual Reconcile / Retry stay explicit):
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /api/v1/license-extension-requests/{id}/explain` | CanReadApprovals + resource read | Natural-language status from request/approval/saga/audit/ledger/poison + live probes for Uncertain items |
+| `GET /api/v1/admin/reconciliation/requests/{id}/rca` | PlatformAdmin | Reconciliation RCA emphasizing Uncertain, ledger mismatches, probes, poison outbox |
+
+Narration is **deterministic Fallback by default** (`AiAssist:Enabled=false`). Optional local Ollama (OpenAI-compatible `BaseUrl`, e.g. `http://127.0.0.1:11434/v1`) may rephrase the summary only; `recommendedAction`, citations, and facts stay composer-authored. No Bedrock / SageMaker / paid cloud LLM is required — keep AWS lab on Fallback.
+
 ## Related
 
 - `docs/failure-scenarios.md` — failure injection stubs
