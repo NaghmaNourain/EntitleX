@@ -1,17 +1,19 @@
 using EntitleX.Application.Abstractions;
+using EntitleX.Application.Notifications;
 using EntitleX.Application.Reconciliation.Models;
 using EntitleX.SharedKernel.Ids;
 using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace EntitleX.Application.Reconciliation;
 
 /// <summary>
 /// Finds uncertain / missing / mismatched outcomes, probes providers by
 /// LogicalOperationId, and repairs local saga state. Never blind-retries
-/// unknown external effects.
+/// unknown external effects. Ages long-lived Uncertain items to Failed.
 /// </summary>
 public sealed class ReconciliationService : IReconciliationService
 {
@@ -22,6 +24,7 @@ public sealed class ReconciliationService : IReconciliationService
     private readonly ILocalFulfillmentOutcomeStore _localOutcomes;
     private readonly IAuditEventStore _audit;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ReconciliationAgingOptions _aging;
     private readonly ILogger<ReconciliationService> _logger;
 
     public ReconciliationService(
@@ -32,6 +35,7 @@ public sealed class ReconciliationService : IReconciliationService
         ILocalFulfillmentOutcomeStore localOutcomes,
         IAuditEventStore audit,
         IUnitOfWork unitOfWork,
+        IOptions<ReconciliationAgingOptions> aging,
         ILogger<ReconciliationService> logger)
     {
         _sagaRepository = sagaRepository;
@@ -41,7 +45,19 @@ public sealed class ReconciliationService : IReconciliationService
         _localOutcomes = localOutcomes;
         _audit = audit;
         _unitOfWork = unitOfWork;
+        _aging = aging.Value;
         _logger = logger;
+    }
+
+    private bool ShouldAgeUncertainToFailed(SagaItemOutcome outcome)
+    {
+        if (_aging.UncertainMaxAgeDays <= 0)
+        {
+            return false;
+        }
+
+        var age = DateTimeOffset.UtcNow - outcome.UpdatedAtUtc;
+        return age >= TimeSpan.FromDays(_aging.UncertainMaxAgeDays);
     }
 
     public async Task<IReadOnlyList<ReconciliationRunResult>> RunBatchAsync(
@@ -397,7 +413,36 @@ public sealed class ReconciliationService : IReconciliationService
                 ? "Provider has no AppliedLicenseOperation; left Uncertain (no blind retry)"
                 : "Provider status unknown; left Uncertain (no blind retry)");
 
-        // Do not demote Succeeded; do not invent Failed on NotFound.
+        // Age out Uncertain/Pending unknowns so operators are not wedged forever (M5).
+        if (outcome.Status is SagaItemOutcomeStatus.Pending or SagaItemOutcomeStatus.Uncertain
+            && ShouldAgeUncertainToFailed(outcome))
+        {
+            var agedDetail =
+                $"Uncertain aged out after {_aging.UncertainMaxAgeDays}d without provider confirmation; marked Failed (retry-eligible). Prior: {detail}";
+            saga.RecordItemFailed(
+                outcome.LogicalOperationId,
+                "UncertainAgedOut",
+                agedDetail,
+                correlationId);
+
+            await AppendAuditAsync(
+                AuditEventTypes.ReconciliationItemMarkedFailed,
+                request.Id,
+                outcome.LogicalOperationId,
+                actor,
+                agedDetail,
+                correlationId,
+                cancellationToken);
+
+            return new ReconciliationItemResult(
+                outcome.LogicalOperationId.Value,
+                request.Items.First(i => i.LogicalOperationId.Equals(outcome.LogicalOperationId))
+                    .Provider.ToString(),
+                ReconciliationItemAction.MarkedFailedRetryEligible,
+                agedDetail);
+        }
+
+        // Do not demote Succeeded; do not invent Failed on fresh NotFound.
         if (outcome.Status is SagaItemOutcomeStatus.Pending or SagaItemOutcomeStatus.Uncertain)
         {
             saga.KeepItemUncertainFromReconciliation(

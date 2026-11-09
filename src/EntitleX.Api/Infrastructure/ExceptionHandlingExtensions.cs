@@ -4,6 +4,8 @@ using EntitleX.Domain.Common;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace EntitleX.Api.Infrastructure;
 
@@ -80,10 +82,35 @@ public static class ExceptionHandlingExtensions
                 "Domain rule violated",
                 domain.Message,
                 null),
+            DbUpdateException db when IsUniqueViolation(db) => (
+                StatusCodes.Status409Conflict,
+                "Conflict",
+                MapUniqueViolationDetail(db),
+                null),
+            PostgresException pg when pg.SqlState == PostgresErrorCodes.UniqueViolation => (
+                StatusCodes.Status409Conflict,
+                "Conflict",
+                string.IsNullOrWhiteSpace(pg.Detail) ? "A unique constraint was violated." : pg.Detail,
+                null),
             _ => (
                 StatusCodes.Status500InternalServerError,
                 "An unexpected error occurred",
                 "An unexpected error occurred while processing the request.",
                 null)
         };
+
+    private static bool IsUniqueViolation(DbUpdateException ex) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
+
+    private static string MapUniqueViolationDetail(DbUpdateException ex)
+    {
+        if (ex.InnerException is PostgresException pg
+            && !string.IsNullOrWhiteSpace(pg.ConstraintName)
+            && pg.ConstraintName.Contains("extension_number", StringComparison.OrdinalIgnoreCase))
+        {
+            return "A license-extension request with this ExtensionNumber already exists.";
+        }
+
+        return "A unique constraint was violated.";
+    }
 }

@@ -32,25 +32,15 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 "Connection string 'EntitleXPlatform' is not configured.");
 
-        services.AddDbContext<EntitleXDbContext>(options =>
-        {
-            // Npgsql pools connections by default (Max Pool Size=100). Tune via connection string
-            // (Minimum Pool Size / Maximum Pool Size / Timeout) — see docs/performance.md.
-            options.UseNpgsql(connectionString, npgsql =>
-            {
-                npgsql.MigrationsHistoryTable("__ef_migrations_history", "public");
-                npgsql.MigrationsAssembly(typeof(EntitleXDbContext).Assembly.FullName);
-                // Batch up to 100 commands per round-trip (helps 1000-item request inserts).
-                npgsql.MaxBatchSize(100);
-                npgsql.CommandTimeout(60);
-            });
-        });
+        services.AddDbContext<EntitleXDbContext>((sp, options) =>
+            ConfigurePlatformDbContext(sp, options, connectionString));
 
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EntitleXDbContext>());
         services.AddScoped<ILicenseExtensionRequestRepository, LicenseExtensionRequestRepository>();
         services.AddScoped<IApprovalCaseRepository, ApprovalCaseRepository>();
         services.AddScoped<ILicenseExtensionSagaRepository, LicenseExtensionSagaRepository>();
         services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<IOutboxPoisonReplayStore, EfOutboxPoisonReplayStore>();
         services.AddScoped<OutboxClaimer>();
         services.AddScoped<OutboxPublisherService>();
         services.AddScoped<IConsumerIdempotencyStore, EfConsumerIdempotencyStore>();
@@ -60,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<IExpirationNotificationStore, EfExpirationNotificationStore>();
         services.AddScoped<ILocalFulfillmentOutcomeStore, EfLocalFulfillmentOutcomeStore>();
         services.AddScoped<ProviderResultProcessor>();
+        services.AddDomainEventDispatch();
 
         services.AddEntitleXMessaging(configuration);
         BindFulfillmentEnqueueOptions(services, configuration);
@@ -76,6 +67,8 @@ public static class DependencyInjection
         services.AddEntitleXAuthentication(configuration, environment);
         services.AddEntitleXEmail(configuration);
         services.AddScheduledNotificationJobs(configuration);
+        services.Configure<Application.Notifications.ReconciliationAgingOptions>(
+            configuration.GetSection(Application.Notifications.ReconciliationAgingOptions.SectionName));
 
         services.AddHealthChecks()
             .Add(CreateProviderRegistration("cloudshield", "CloudShield"))
@@ -95,21 +88,14 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 "Connection string 'EntitleXPlatform' is not configured.");
 
-        services.AddDbContext<EntitleXDbContext>(options =>
-        {
-            options.UseNpgsql(connectionString, npgsql =>
-            {
-                npgsql.MigrationsHistoryTable("__ef_migrations_history", "public");
-                npgsql.MigrationsAssembly(typeof(EntitleXDbContext).Assembly.FullName);
-                npgsql.MaxBatchSize(100);
-                npgsql.CommandTimeout(60);
-            });
-        });
+        services.AddDbContext<EntitleXDbContext>((sp, options) =>
+            ConfigurePlatformDbContext(sp, options, connectionString));
 
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EntitleXDbContext>());
         services.AddScoped<ILicenseExtensionRequestRepository, LicenseExtensionRequestRepository>();
         services.AddScoped<ILicenseExtensionSagaRepository, LicenseExtensionSagaRepository>();
         services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<IOutboxPoisonReplayStore, EfOutboxPoisonReplayStore>();
         services.AddScoped<OutboxClaimer>();
         services.AddScoped<OutboxPublisherService>();
         services.AddScoped<IConsumerIdempotencyStore, EfConsumerIdempotencyStore>();
@@ -118,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<IExpirationNotificationStore, EfExpirationNotificationStore>();
         services.AddScoped<ILocalFulfillmentOutcomeStore, EfLocalFulfillmentOutcomeStore>();
         services.AddScoped<ProviderResultProcessor>();
+        services.AddDomainEventDispatch();
         services.AddProviderHttpClients(configuration);
         services.AddTransient<IProviderOperationStatusClient, CloudShieldOperationStatusClient>();
         services.AddTransient<IProviderOperationStatusClient, NetworkGuardOperationStatusClient>();
@@ -129,17 +116,50 @@ public static class DependencyInjection
         return services;
     }
 
+    private static void ConfigurePlatformDbContext(
+        IServiceProvider sp,
+        DbContextOptionsBuilder options,
+        string connectionString)
+    {
+        options.UseNpgsql(connectionString, npgsql =>
+        {
+            npgsql.MigrationsHistoryTable("__ef_migrations_history", "public");
+            npgsql.MigrationsAssembly(typeof(EntitleXDbContext).Assembly.FullName);
+            npgsql.MaxBatchSize(100);
+            npgsql.CommandTimeout(60);
+        });
+        options.AddInterceptors(sp.GetRequiredService<DomainEventSaveChangesInterceptor>());
+    }
+
     private static void BindFulfillmentEnqueueOptions(
         IServiceCollection services,
         IConfiguration configuration)
     {
-        // Application-owned enqueue options — bound from Messaging:Sqs without referencing adapters.
+        // Application-owned enqueue options — bound from Messaging:* without referencing adapters.
         services.Configure<FulfillmentEnqueueOptions>(options =>
         {
+            var preferKafka = configuration["Messaging:Fulfillment:PreferDirectKafka"];
+            if (bool.TryParse(preferKafka, out var prefer))
+            {
+                options.PreferDirectKafka = prefer;
+            }
+
             var queue = configuration["Messaging:Sqs:FulfillmentQueueName"];
             if (!string.IsNullOrWhiteSpace(queue))
             {
                 options.FulfillmentQueueName = queue;
+            }
+
+            var csTopic = configuration["Messaging:Kafka:CloudShieldCommandsTopic"];
+            if (!string.IsNullOrWhiteSpace(csTopic))
+            {
+                options.CloudShieldCommandsTopic = csTopic;
+            }
+
+            var ngTopic = configuration["Messaging:Kafka:NetworkGuardCommandsTopic"];
+            if (!string.IsNullOrWhiteSpace(ngTopic))
+            {
+                options.NetworkGuardCommandsTopic = ngTopic;
             }
         });
     }
@@ -156,16 +176,8 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 "Connection string 'EntitleXPlatform' is not configured.");
 
-        services.AddDbContext<EntitleXDbContext>(options =>
-        {
-            options.UseNpgsql(connectionString, npgsql =>
-            {
-                npgsql.MigrationsHistoryTable("__ef_migrations_history", "public");
-                npgsql.MigrationsAssembly(typeof(EntitleXDbContext).Assembly.FullName);
-                npgsql.MaxBatchSize(100);
-                npgsql.CommandTimeout(60);
-            });
-        });
+        services.AddDbContext<EntitleXDbContext>((sp, options) =>
+            ConfigurePlatformDbContext(sp, options, connectionString));
 
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EntitleXDbContext>());
         services.AddScoped<ILicenseExtensionRequestRepository, LicenseExtensionRequestRepository>();
@@ -174,6 +186,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditEventStore, EfAuditEventStore>();
         services.AddScoped<IApprovalReminderStore, EfApprovalReminderStore>();
         services.AddScoped<IExpirationNotificationStore, EfExpirationNotificationStore>();
+        services.AddDomainEventDispatch();
 
         services.AddProviderHttpClients(configuration);
         services.AddTransient<IProviderEntitlementClient, CloudShieldEntitlementClient>();

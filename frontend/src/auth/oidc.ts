@@ -23,7 +23,7 @@ function buildSettings(): UserManagerSettings {
     response_type: 'code',
     scope: 'openid profile email',
     automaticSilentRenew: true,
-    userStore: new WebStorageStateStore({ store: window.localStorage }),
+    userStore: new WebStorageStateStore({ store: window.sessionStorage }),
     monitorSession: false,
   }
 }

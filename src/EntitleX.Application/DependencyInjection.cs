@@ -6,6 +6,7 @@ using EntitleX.Application.EntitlementAggregation;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Application.Fulfillment;
 using EntitleX.Application.LicenseExtension.Retry;
+using EntitleX.Application.Notifications;
 using EntitleX.Application.Reconciliation;
 using EntitleX.Application.Saga;
 using FluentValidation;
@@ -31,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IEntitlementAggregationService, EntitlementAggregationService>();
         services.AddScoped<IReconciliationGate, ReconciliationGate>();
         services.AddScoped<IReconciliationService, ReconciliationService>();
+        services.Configure<ReconciliationAgingOptions>(_ => { });
         services.AddSagaOrchestration();
 
         return services;

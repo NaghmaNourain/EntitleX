@@ -1,5 +1,4 @@
 using EntitleX.Application.Abstractions;
-using EntitleX.Application.Fulfillment;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Messaging.Contracts;
 using EntitleX.SharedKernel.Ids;
@@ -20,7 +19,7 @@ public sealed class FulfillmentOutboxService : IFulfillmentOutboxService
         _options = options.Value;
     }
 
-    public async Task EnqueueAfterFinalApprovalAsync(
+    public async Task<bool> EnqueueAfterFinalApprovalAsync(
         LicenseExtensionRequest request,
         Guid? correlationId = null,
         Guid? causationId = null,
@@ -34,9 +33,64 @@ public sealed class FulfillmentOutboxService : IFulfillmentOutboxService
 
         request.BeginFulfillment();
 
-        var messageId = MessageId.New();
         var correlation = correlationId ?? CorrelationId.New().Value;
+        var causation = causationId ?? MessageId.New().Value;
 
+        if (_options.PreferDirectKafka)
+        {
+            await EnqueueProviderCommandsAsync(request, correlation, causation, cancellationToken);
+            return true;
+        }
+
+        await EnqueueLegacySqsCommandAsync(request, correlation, causation, cancellationToken);
+        return false;
+    }
+
+    private async Task EnqueueProviderCommandsAsync(
+        LicenseExtensionRequest request,
+        Guid correlation,
+        Guid causation,
+        CancellationToken cancellationToken)
+    {
+        foreach (var item in request.Items)
+        {
+            var providerCommand = new ProviderLicenseExtensionCommandV1(
+                request.Id.Value,
+                item.Id.Value,
+                item.EntitlementId.Value,
+                item.Provider.ToString(),
+                item.LogicalOperationId.Value,
+                item.AttemptId.Value,
+                item.RequestedExpiryUtc);
+
+            var messageId = MessageId.New();
+            var envelope = MessageEnvelope.Create(
+                MessageTypes.ProviderLicenseExtensionCommand,
+                providerCommand,
+                messageId.Value,
+                correlationId: correlation,
+                causationId: causation,
+                requestId: request.Id.Value,
+                logicalOperationId: item.LogicalOperationId.Value);
+
+            var topic = ResolveTopic(item.Provider.ToString());
+            await _outboxWriter.EnqueueAsync(
+                envelope,
+                new OutboxDispatchTarget(
+                    OutboxTransport.Kafka,
+                    topic,
+                    PartitionKey: item.EntitlementId.Value),
+                cancellationToken);
+        }
+    }
+
+    private async Task EnqueueLegacySqsCommandAsync(
+        LicenseExtensionRequest request,
+        Guid correlation,
+        Guid causation,
+        CancellationToken cancellationToken)
+    {
+        var messageId = MessageId.New();
         var command = new FulfillmentCommandV1(
             request.Id.Value,
             request.ExtensionNumber,
@@ -54,7 +108,7 @@ public sealed class FulfillmentOutboxService : IFulfillmentOutboxService
             command,
             messageId.Value,
             correlationId: correlation,
-            causationId: causationId,
+            causationId: causation,
             requestId: request.Id.Value);
 
         await _outboxWriter.EnqueueAsync(
@@ -64,4 +118,9 @@ public sealed class FulfillmentOutboxService : IFulfillmentOutboxService
                 _options.FulfillmentQueueName),
             cancellationToken);
     }
+
+    private string ResolveTopic(string provider) =>
+        provider.Equals("NetworkGuard", StringComparison.OrdinalIgnoreCase)
+            ? _options.NetworkGuardCommandsTopic
+            : _options.CloudShieldCommandsTopic;
 }

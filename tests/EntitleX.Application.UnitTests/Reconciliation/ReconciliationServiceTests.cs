@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using EntitleX.Application.Abstractions;
+using EntitleX.Application.Notifications;
 using EntitleX.Application.Reconciliation;
 using EntitleX.Application.Reconciliation.Models;
 using EntitleX.SharedKernel.Ids;
@@ -7,6 +8,7 @@ using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace EntitleX.Application.UnitTests.Reconciliation;
 
@@ -171,6 +173,7 @@ public sealed class ReconciliationServiceTests
             local,
             audit,
             new FakeUnitOfWork(),
+            Options.Create(new ReconciliationAgingOptions { UncertainMaxAgeDays = 0 }),
             NullLogger<ReconciliationService>.Instance);
 
     private static (LicenseExtensionRequest Request, LicenseExtensionSaga Saga) CreateUncertainRequest()
