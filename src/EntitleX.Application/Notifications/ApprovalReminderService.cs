@@ -147,13 +147,6 @@ public sealed class ApprovalReminderService : IApprovalReminderService
                     _options.EscalationDelay,
                     existing?.EscalatedAtUtc))
             {
-                var saga = await _sagas.GetByRequestIdAsync(approvalCase.RequestId, cancellationToken);
-                if (saga is null)
-                {
-                    skipped++;
-                    continue;
-                }
-
                 // Re-check pending — may have been decided since reminder.
                 var refreshed = await _approvals.GetByIdAsync(approvalCase.Id, cancellationToken);
                 if (refreshed is null || refreshed.Status != ApprovalCaseStatus.Pending)
@@ -162,16 +155,24 @@ public sealed class ApprovalReminderService : IApprovalReminderService
                     continue;
                 }
 
-                saga.ApplyConfiguredTerminalState(
-                    terminal,
-                    $"Approval reminder escalation after {_options.EscalationDelayHours}h (configured terminal={terminal})",
-                    actor: "approval-reminder",
-                    correlationId: correlation,
-                    atUtc: now);
+                var request = await _requests.GetByIdAsync(approvalCase.RequestId, cancellationToken);
+                if (request is null || stage is null)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                // M5: reminders notify only — do not mutate saga/workflow authority.
+                await _notifications.NotifyApprovalReminderAsync(
+                    request,
+                    refreshed,
+                    stage,
+                    now - pendingSince,
+                    cancellationToken);
 
                 await _reminderStore.MarkEscalatedAsync(
                     windowKey,
-                    terminal.ToString(),
+                    "EscalationNotified",
                     now,
                     cancellationToken);
 
@@ -182,7 +183,7 @@ public sealed class ApprovalReminderService : IApprovalReminderService
                         approvalCase.RequestId,
                         LogicalOperationId: null,
                         Actor: "approval-reminder",
-                        Detail: $"Applied configured terminal state '{terminal}' (window={windowKey})",
+                        Detail: $"Escalation notification sent after {_options.EscalationDelayHours}h (notify-only; configured terminal={terminal} not applied) (window={windowKey})",
                         correlation,
                         now),
                     cancellationToken);

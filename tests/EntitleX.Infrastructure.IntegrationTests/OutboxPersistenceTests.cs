@@ -71,7 +71,8 @@ public sealed class OutboxPersistenceTests : IAsyncLifetime
         });
         var enqueueOptions = Options.Create(new FulfillmentEnqueueOptions
         {
-            FulfillmentQueueName = "entitlex-fulfillment"
+            PreferDirectKafka = true,
+            CloudShieldCommandsTopic = "cloudshield.license-extension.commands"
         });
 
         var writer = new OutboxWriter(db, messagingOptions);
@@ -83,9 +84,9 @@ public sealed class OutboxPersistenceTests : IAsyncLifetime
 
         var messages = await db.OutboxMessages.AsNoTracking().ToListAsync();
         Assert.Single(messages);
-        Assert.Equal(MessageTypes.FulfillmentCommand, messages[0].MessageType);
-        Assert.Equal(OutboxDestinationKind.Sqs, messages[0].DestinationKind);
-        Assert.Equal("entitlex-fulfillment", messages[0].Destination);
+        Assert.Equal(MessageTypes.ProviderLicenseExtensionCommand, messages[0].MessageType);
+        Assert.Equal(OutboxDestinationKind.Kafka, messages[0].DestinationKind);
+        Assert.Equal("cloudshield.license-extension.commands", messages[0].Destination);
         Assert.Equal(OutboxMessageStatus.Pending, messages[0].Status);
         Assert.Equal(aggregate.Id.Value, messages[0].RequestId);
         Assert.Equal(LicenseExtensionRequestStatus.InFulfillment, aggregate.Status);

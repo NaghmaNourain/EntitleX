@@ -119,6 +119,17 @@ public sealed class SqsFulfillmentConsumer
             message.ReceiptHandle,
             cancellationToken);
 
+    /// <summary>Heartbeat: extend visibility so large fan-outs do not redeliver mid-process.</summary>
+    public Task ExtendVisibilityAsync(
+        SqsReceivedMessage message,
+        int visibilityTimeoutSeconds,
+        CancellationToken cancellationToken = default) =>
+        _publisher.Client.ChangeMessageVisibilityAsync(
+            message.QueueUrl,
+            message.ReceiptHandle,
+            Math.Clamp(visibilityTimeoutSeconds, 1, 43200),
+            cancellationToken);
+
     public async Task MoveToDlqAndDeleteAsync(
         SqsReceivedMessage message,
         string reason,

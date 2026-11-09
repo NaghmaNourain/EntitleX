@@ -169,6 +169,29 @@ public sealed class OutboxMessage
         AvailableAtUtc = atUtc;
     }
 
+    /// <summary>Operator replay: Poison → Pending with a fresh attempt budget.</summary>
+    public void ReplayFromPoison(DateTimeOffset atUtc, int? resetMaxAttempts = null)
+    {
+        if (Status != OutboxMessageStatus.Poison)
+        {
+            throw new InvalidOperationException(
+                $"Only Poison outbox rows can be replayed (was '{Status}').");
+        }
+
+        Status = OutboxMessageStatus.Pending;
+        AttemptCount = 0;
+        if (resetMaxAttempts is > 0)
+        {
+            MaxAttempts = resetMaxAttempts.Value;
+        }
+
+        LastError = null;
+        LockedUntilUtc = null;
+        LockedBy = null;
+        PublishedAtUtc = null;
+        AvailableAtUtc = atUtc;
+    }
+
     private static string Truncate(string error) =>
         error.Length <= 2000 ? error : error[..2000];
 }

@@ -144,7 +144,7 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
                 $"Saga for request '{request.Id}' must be Approved before fulfillment (was '{saga.State}').");
         }
 
-        await _fulfillmentOutbox.EnqueueAfterFinalApprovalAsync(
+        var dispatchedDirectToKafka = await _fulfillmentOutbox.EnqueueAfterFinalApprovalAsync(
             request,
             correlationId,
             causationId,
@@ -158,6 +158,14 @@ public sealed class LicenseExtensionSagaOrchestrator : ILicenseExtensionSagaOrch
         saga.QueueFulfillment(
             items,
             correlationId?.ToString("D"));
+
+        // Direct Kafka outbox: advance to Processing in the same UoW (no SQS hop).
+        // Legacy SQS: stay QueuedForFulfillment until FulfillmentCommandProcessor runs.
+        if (dispatchedDirectToKafka)
+        {
+            saga.MarkProcessing(correlationId?.ToString("D"));
+        }
+
         SagaTelemetry.RecordTransition(from, saga.State.ToString());
     }
 

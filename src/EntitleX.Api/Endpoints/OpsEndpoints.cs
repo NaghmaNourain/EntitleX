@@ -1,4 +1,5 @@
 using EntitleX.Application.Ops.GetOpsSummary;
+using EntitleX.Application.Ops.ReplayPoisonOutbox;
 using EntitleX.Infrastructure.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,13 @@ public static class OpsEndpoints
             .Produces(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
+        group.MapPost("/outbox/poison/replay", ReplayPoisonAsync)
+            .WithName("ReplayPoisonOutbox")
+            .WithOpenApi()
+            .RequireAuthorization(AuthorizationPolicies.CanManageReconciliation)
+            .Produces(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
         return app;
     }
 
@@ -29,6 +37,18 @@ public static class OpsEndpoints
     {
         var result = await sender.Send(
             new GetOpsSummaryQuery(take <= 0 ? 25 : take),
+            cancellationToken);
+        return Results.Ok(result);
+    }
+
+    private static async Task<IResult> ReplayPoisonAsync(
+        [FromQuery] Guid? outboxMessageId,
+        [FromQuery] int take,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new ReplayPoisonOutboxCommand(outboxMessageId, take <= 0 ? 25 : take),
             cancellationToken);
         return Results.Ok(result);
     }

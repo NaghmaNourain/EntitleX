@@ -52,7 +52,9 @@ public sealed class ApprovalReminderServiceTests
 
         var day8 = await service.RunAsync(T0.AddDays(7).AddHours(24));
         Assert.Equal(1, day8.EscalationsApplied);
-        Assert.Equal(SagaState.Escalated, saga.State);
+        // Notify-only: saga workflow authority is not mutated by reminders (M5).
+        Assert.False(saga.State == SagaState.Escalated);
+        Assert.Equal(2, mail.Reminders.Count);
         Assert.Contains(audit.Events, e => e.EventType == AuditEventTypes.ApprovalReminderEscalated);
 
         // Escalation window also idempotent.
@@ -61,7 +63,7 @@ public sealed class ApprovalReminderServiceTests
     }
 
     [Fact]
-    public async Task Run_UsesConfiguredTerminalState_NotHardcodedLiteralInServicePath()
+    public async Task Run_Escalation_IsNotifyOnly_DoesNotApplyTerminalSagaState()
     {
         var (request, approval, saga) = CreatePending(T0);
         var options = Options.Create(new ApprovalReminderOptions
@@ -86,7 +88,8 @@ public sealed class ApprovalReminderServiceTests
         await service.RunAsync(T0.AddDays(7));
         await service.RunAsync(T0.AddDays(7).AddHours(24));
 
-        Assert.Equal(options.Value.TerminalSagaState, store.ByWindow.Values.Single().TerminalStateApplied);
+        Assert.Equal("EscalationNotified", store.ByWindow.Values.Single().TerminalStateApplied);
+        Assert.False(saga.State == SagaState.Escalated);
     }
 
     private static (LicenseExtensionRequest Request, ApprovalCase Approval, LicenseExtensionSaga Saga) CreatePending(

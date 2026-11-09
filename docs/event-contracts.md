@@ -22,7 +22,7 @@ CLR type: `MessageEnvelope`.
 
 | Type constant (`MessageTypes`) | Payload DTO | Transport |
 |--------------------------------|-------------|-----------|
-| `entitlex.fulfillment.command` | `FulfillmentCommandV1` (+ `FulfillmentItemV1`) | Outbox → SQS |
+| `entitlex.fulfillment.command` | `FulfillmentCommandV1` (+ `FulfillmentItemV1`) | Legacy Outbox → SQS (opt-in `EnableSqsDispatcher`) |
 | `entitlex.provider.license-extension.command` | `ProviderLicenseExtensionCommandV1` | Kafka provider topics |
 | `entitlex.provider.license-extension.completed` | `ProviderLicenseExtensionCompletedV1` | Kafka results |
 | `entitlex.provider.license-extension.failed` | `ProviderLicenseExtensionFailedV1` | Kafka results |
@@ -92,4 +92,5 @@ Options: `Messaging:Outbox` (`BatchSize`, `PollIntervalMilliseconds`, `LockDurat
 - Consumers stage `(consumerName, idempotencyKey)` in `processed_messages` in the **same** unit of work as business side effects (claim-before-flush is incorrect). Provider-result keys use `result:{LogicalOperationId}:{AttemptId}`.
 - Fulfillment SQS: leave message on failure (visibility timeout retry); after repeated failures, move to DLQ.
 - Outbox publisher: `FOR UPDATE SKIP LOCKED`, exponential retry, `Poison` after `MaxAttempts`.
-- Flow summary: approval final → outbox (same PG txn) → `OutboxPublisher` → SQS → `FulfillmentCommandProcessor` → Kafka per-item commands → simulator consumers → results topic → `ProviderResultProcessor`.
+- Flow summary (preferred, `PreferDirectKafka=true`): approval final → outbox Kafka provider commands (same PG txn) → `OutboxPublisher` → simulator consumers → results topic → `EntitleX.ResultsWorker` / `ProviderResultProcessor`.
+- Legacy hop (`PreferDirectKafka=false` + `EnableSqsDispatcher=true`): outbox → SQS → `FulfillmentCommandProcessor` → Kafka per-item outbox rows.

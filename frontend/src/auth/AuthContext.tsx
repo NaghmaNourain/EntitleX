@@ -40,9 +40,13 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null)
 
+/** Prefer sessionStorage over localStorage to reduce XSS persistence of bearer tokens (M3). */
+const sessionStore: Storage | null =
+  typeof window !== 'undefined' ? window.sessionStorage : null
+
 function readStoredUser(): AuthUser | null {
   try {
-    const raw = localStorage.getItem(USER_KEY)
+    const raw = sessionStore?.getItem(USER_KEY) ?? null
     return raw ? (JSON.parse(raw) as AuthUser) : null
   } catch {
     return null
@@ -50,19 +54,26 @@ function readStoredUser(): AuthUser | null {
 }
 
 function persistSession(token: string, user: AuthUser, source: AuthSource) {
-  localStorage.setItem(TOKEN_KEY, token)
-  localStorage.setItem(USER_KEY, JSON.stringify(user))
-  localStorage.setItem(AUTH_SOURCE_KEY, source)
+  sessionStore?.setItem(TOKEN_KEY, token)
+  sessionStore?.setItem(USER_KEY, JSON.stringify(user))
+  sessionStore?.setItem(AUTH_SOURCE_KEY, source)
+  // Clear any legacy localStorage session left from earlier builds.
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+  localStorage.removeItem(AUTH_SOURCE_KEY)
 }
 
 function clearSession() {
+  sessionStore?.removeItem(TOKEN_KEY)
+  sessionStore?.removeItem(USER_KEY)
+  sessionStore?.removeItem(AUTH_SOURCE_KEY)
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
   localStorage.removeItem(AUTH_SOURCE_KEY)
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY))
+  const [token, setToken] = useState<string | null>(() => sessionStore?.getItem(TOKEN_KEY) ?? null)
   const [user, setUser] = useState<AuthUser | null>(() => readStoredUser())
   const [isLoading, setIsLoading] = useState(true)
 
@@ -85,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(session.token)
         setUser(session.user)
       } catch {
-        // Stale OIDC state — fall back to whatever is in localStorage (may be DevToken).
+        // Stale OIDC state — fall back to whatever is in sessionStorage (may be DevToken).
       } finally {
         if (!cancelled) {
           setIsLoading(false)

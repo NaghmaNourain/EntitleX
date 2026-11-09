@@ -4,7 +4,11 @@ using Microsoft.Extensions.Options;
 
 namespace EntitleX.FulfillmentWorker;
 
-/// <summary>Consumes fulfillment commands from SQS with visibility timeout + DLQ handling.</summary>
+/// <summary>
+/// Legacy SQS fulfillment dispatcher (opt-in via Messaging:Fulfillment:EnableSqsDispatcher).
+/// Extends visibility while processing so large batches do not redeliver mid fan-out.
+/// App-level DLQ move after PoisonReceiveCount; infra maxReceiveCount is the secondary owner.
+/// </summary>
 public sealed class FulfillmentSqsWorker(
     SqsFulfillmentConsumer consumer,
     IServiceScopeFactory scopeFactory,
@@ -15,7 +19,7 @@ public sealed class FulfillmentSqsWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Fulfillment SQS worker started");
+        logger.LogInformation("Fulfillment SQS worker started (legacy dispatcher)");
         var idle = TimeSpan.FromMilliseconds(
             Math.Clamp(options.Value.Fulfillment.IdleDelayMilliseconds, 100, 10_000));
 
@@ -51,6 +55,34 @@ public sealed class FulfillmentSqsWorker(
 
     private async Task HandleOneAsync(SqsReceivedMessage message, CancellationToken cancellationToken)
     {
+        var visibility = Math.Clamp(options.Value.Sqs.VisibilityTimeoutSeconds, 30, 43200);
+        var heartbeatEvery = TimeSpan.FromSeconds(
+            Math.Clamp(options.Value.Fulfillment.VisibilityHeartbeatSeconds, 5, visibility / 2));
+
+        using var heartbeatCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var heartbeat = Task.Run(async () =>
+        {
+            try
+            {
+                while (!heartbeatCts.Token.IsCancellationRequested)
+                {
+                    await Task.Delay(heartbeatEvery, heartbeatCts.Token);
+                    await consumer.ExtendVisibilityAsync(message, visibility, heartbeatCts.Token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // expected on completion
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "SQS visibility heartbeat failed for {MessageId}",
+                    message.Envelope.MessageId);
+            }
+        }, CancellationToken.None);
+
         try
         {
             using var scope = scopeFactory.CreateScope();
@@ -75,6 +107,18 @@ public sealed class FulfillmentSqsWorker(
                 await consumer.MoveToDlqAndDeleteAsync(message, ex.Message, cancellationToken);
             }
             // else: leave message — visibility timeout will make it available again
+        }
+        finally
+        {
+            await heartbeatCts.CancelAsync();
+            try
+            {
+                await heartbeat;
+            }
+            catch
+            {
+                // ignore
+            }
         }
     }
 }
