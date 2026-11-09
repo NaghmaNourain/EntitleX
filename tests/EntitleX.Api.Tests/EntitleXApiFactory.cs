@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Serilog;
 using Testcontainers.PostgreSql;
 
 namespace EntitleX.Api.Tests;
@@ -47,10 +48,19 @@ public sealed class EntitleXApiFactory : WebApplicationFactory<Program>, IAsyncL
         {
             await _postgres.DisposeAsync();
         }
+
+        await Log.CloseAndFlushAsync();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        if (string.IsNullOrWhiteSpace(ConnectionString))
+        {
+            throw new InvalidOperationException(
+                "EntitleXApiFactory.ConnectionString is empty; Testcontainers PostgreSQL was not started. " +
+                "API integration tests require Docker.");
+        }
+
         builder.UseEnvironment(Environments.Development);
 
         builder.ConfigureAppConfiguration((_, config) =>
@@ -90,6 +100,19 @@ public sealed class EntitleXApiFactory : WebApplicationFactory<Program>, IAsyncL
             services.AddTransient<IProviderEntitlementClient, StubCloudShieldClient>();
             services.AddTransient<IProviderEntitlementClient, StubNetworkGuardClient>();
         });
+    }
+
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        // Program.cs assigns a Serilog bootstrap logger and UseSerilog freezes it.
+        // Reset between host builds so a misconfigured parallel fixture cannot poison the run.
+        Log.CloseAndFlush();
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Warning()
+            .WriteTo.Console()
+            .CreateLogger();
+
+        return base.CreateHost(builder);
     }
 
     public async Task ResetDatabaseAsync()

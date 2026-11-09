@@ -11,7 +11,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace EntitleX.Api.Tests;
 
-public sealed class ConcurrencyConflictApiTests : IClassFixture<EntitleXApiFactory>, IAsyncLifetime
+[Collection(ApiCollection.Name)]
+public sealed class ConcurrencyConflictApiTests : IAsyncLifetime
 {
     private readonly EntitleXApiFactory _factory;
     private HttpClient? _client;

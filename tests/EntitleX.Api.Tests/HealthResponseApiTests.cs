@@ -3,7 +3,8 @@ using System.Text.Json;
 
 namespace EntitleX.Api.Tests;
 
-public sealed class HealthResponseApiTests : IClassFixture<EntitleXApiFactory>, IAsyncLifetime
+[Collection(ApiCollection.Name)]
+public sealed class HealthResponseApiTests : IAsyncLifetime
 {
     private readonly EntitleXApiFactory _factory;
     private HttpClient? _client;
