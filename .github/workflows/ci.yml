@@ -349,6 +349,7 @@ jobs:
           tags: entitlex-frontend:ci
 
       - name: Scan frontend image (Trivy)
+        # Same gate as other images. Frontend base is patched via apk upgrade in Dockerfile.
         uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: entitlex-frontend:ci
@@ -356,3 +357,6 @@ jobs:
           exit-code: "1"
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+          # OS packages only — SPA static assets have no language deps in the final image.
+          vuln-type: os
+
