@@ -145,7 +145,7 @@ Table `http_write_idempotency_records` (`IApiIdempotencyStore` / `EfApiIdempoten
 
 Same key + same actor + same fingerprint → replay prior result. Key reuse with a different fingerprint/operation/actor → `409 Conflict`.
 
-Write endpoints also use ASP.NET sliding-window rate limiting (`RateLimiting:WritePermitLimit`, default 30/min per user).
+Write endpoints also use ASP.NET sliding-window rate limiting (`RateLimiting:WritePermitLimit`, default 30/min per user). Global fixed-window limits also apply: anonymous per IP (`AnonymousPermitLimit`, default 60/min) and authenticated per user (`AuthenticatedPermitLimit`, default 120/min).
 
 ## Related
 

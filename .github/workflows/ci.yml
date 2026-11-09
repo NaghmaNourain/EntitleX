@@ -39,6 +39,7 @@ jobs:
         run: |
           dotnet test tests/EntitleX.Infrastructure.IntegrationTests/EntitleX.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
           dotnet test tests/CloudShield.Infrastructure.IntegrationTests/CloudShield.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
+          dotnet test tests/EntitleX.Api.Tests/EntitleX.Api.Tests.csproj --configuration Release --no-build --verbosity normal
 
       - name: E2E scaffolding tests
         # Large 1000-item scenario skips without ENTITLEX_E2E=1 + Compose infra.

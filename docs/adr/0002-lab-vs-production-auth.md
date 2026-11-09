@@ -24,7 +24,7 @@ EntitleX supports local labs (Keycloak + optional DevToken HMAC) and cloud IdPs 
 - Keycloak OIDC is the preferred path; DevToken remains available when `Jwt:EnableDevTokenEndpoint=true`.
 - DevToken may mint seed roles, but **`PlatformAdmin` requires `Jwt:AllowDevPlatformAdmin=true`** (default `false`). Mis-setting `ASPNETCORE_ENVIRONMENT=Development` is an ops failure mode — Production still forces DevToken off.
 - OIDC audience may be empty only in Development (Keycloak lab flexibility); prefer setting `Oidc:Audience=entitlex-api`.
-- Vite CORS (`localhost:5173` / `127.0.0.1:5173`) is Development-only.
+- Vite CORS (`localhost:5173` / `127.0.0.1:5173`) is Development-only. Production SPA is same-origin behind nginx (see [deployment.md](../deployment.md#cors-and-spa-hosting)).
 - `/metrics` stays anonymous for local Prometheus scrapes.
 
 ### Application authorization

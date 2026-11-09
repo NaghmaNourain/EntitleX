@@ -1,3 +1,4 @@
+using EntitleX.Api.Infrastructure;
 using EntitleX.Application.Audit.GetRequestAudit;
 using EntitleX.Infrastructure.Identity;
 using MediatR;
@@ -24,13 +25,24 @@ public static class AuditEndpoints
     private static async Task<IResult> GetByRequestAsync(
         Guid requestId,
         ISender sender,
+        int? page,
+        int? pageSize,
         int? take,
+        int? skip,
         DateTimeOffset? afterOccurredAtUtc,
         Guid? afterId,
         CancellationToken cancellationToken)
     {
+        var paging = Pagination.Normalize(page, pageSize, take, skip);
+
         var result = await sender.Send(
-            new GetRequestAuditQuery(requestId, take, afterOccurredAtUtc, afterId),
+            new GetRequestAuditQuery(
+                requestId,
+                paging.PageSize,
+                afterOccurredAtUtc,
+                afterId,
+                paging.Page,
+                paging.PageSize),
             cancellationToken);
         return Results.Ok(result);
     }

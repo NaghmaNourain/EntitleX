@@ -25,20 +25,27 @@ public sealed class GetRequestAuditQueryHandler
         var requestId = RequestId.From(query.RequestId);
         await _authorization.EnsureCanReadRequestAsync(requestId, cancellationToken);
 
-        IReadOnlyList<AuditEventRecord> events;
+        var page = query.Page < 1 ? 1 : query.Page;
+        var pageSize = Math.Clamp(query.PageSize > 0 ? query.PageSize : (query.Take ?? 50), 1, 100);
 
-        if (query.Take is not null)
+        // Store still uses Take(limit) / keyset; totalCount comes from the full request ledger.
+        var all = await _audit.ListByRequestAsync(requestId, cancellationToken);
+        var totalCount = all.Count;
+
+        IReadOnlyList<AuditEventRecord> events;
+        if (query.AfterOccurredAtUtc is not null && query.AfterId is not null)
         {
             events = await _audit.ListByRequestKeysetAsync(
                 requestId,
-                query.Take.Value,
+                pageSize,
                 query.AfterOccurredAtUtc,
                 query.AfterId,
                 cancellationToken);
         }
         else
         {
-            events = await _audit.ListByRequestAsync(requestId, cancellationToken);
+            var skip = (page - 1) * pageSize;
+            events = all.Skip(skip).Take(pageSize).ToList();
         }
 
         var dtos = events.Select(e => new AuditEventDto(
@@ -53,13 +60,20 @@ public sealed class GetRequestAuditQueryHandler
 
         DateTimeOffset? nextOccurred = null;
         Guid? nextId = null;
-        if (query.Take is not null && dtos.Count == query.Take.Value && dtos.Count > 0)
+        if (dtos.Count == pageSize && dtos.Count > 0)
         {
             var last = dtos[^1];
             nextOccurred = last.OccurredAtUtc;
             nextId = last.Id;
         }
 
-        return new RequestAuditPageDto(query.RequestId, dtos, nextOccurred, nextId);
+        return new RequestAuditPageDto(
+            query.RequestId,
+            dtos,
+            nextOccurred,
+            nextId,
+            page,
+            pageSize,
+            totalCount);
     }
 }

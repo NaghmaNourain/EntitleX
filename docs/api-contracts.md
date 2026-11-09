@@ -26,10 +26,22 @@ OIDC (generic): `Oidc:Enabled`, `Oidc:Authority`, `Oidc:Audience`, `Oidc:RoleCla
 
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| `GET` | `/health` | Anonymous | Liveness |
-| `GET` | `/health/ready` | Anonymous | ASP.NET health checks |
-| `GET` | `/health/providers` | Anonymous | Provider-tagged checks |
+| `GET` | `/health` | Anonymous | Liveness (`status`, `service`, `timestampUtc`) |
+| `GET` | `/health/ready` | Anonymous | Readiness — JSON `{ status, checks:[{name,status}] }` only (no descriptions/exceptions) |
+| `GET` | `/health/providers` | Anonymous | Provider-tagged checks — same slim JSON shape |
 | `GET` | `/metrics` | Scraping | Prometheus |
+
+### Rate limiting
+
+Configured under `RateLimiting` in `appsettings.json`:
+
+| Setting | Default | Scope |
+|---------|---------|--------|
+| `AnonymousPermitLimit` | 60 / `WindowSeconds` (60) | Fixed-window per remote IP (covers `/health*`, DevToken) |
+| `AuthenticatedPermitLimit` | 120 / window | Fixed-window per user id |
+| `WritePermitLimit` | 30 / `WriteWindowSeconds` (60) | Sliding-window on create / decide / retry / ops writes |
+
+Disable with `RateLimiting:Enabled=false` (tests).
 
 ### Dev tokens
 
@@ -63,9 +75,9 @@ Returns `201 Created` with new request DTO (`Location` → `/api/v1/license-exte
 
 | Method | Path | Auth | Handler |
 |--------|------|------|---------|
-| `GET` | `/api/v1/entitlements/search?customerId=` | `PlatformAdmin` / `DealDeskManager` | `EntitlementAggregationEndpoints.SearchAsync` → `SearchCustomerEntitlementsQuery` |
+| `GET` | `/api/v1/entitlements/search?customerId=` | `CanSearchEntitlements` | `EntitlementAggregationEndpoints.SearchAsync` → `SearchCustomerEntitlementsQuery` |
 
-Aggregates CloudShield + NetworkGuard; partial results when a provider fails.
+Aggregates CloudShield + NetworkGuard; partial results when a provider fails. List paging: `page` + `pageSize` (max 100; legacy `take`/`skip` accepted). Response includes `entitlements` (page slice), `page`, `pageSize`, `totalCount`, plus `providers` / `isPartial`.
 
 ### Approvals
 
@@ -78,7 +90,9 @@ Aggregates CloudShield + NetworkGuard; partial results when a provider fails.
 
 Decide body: `{ "outcome": "Approved" | "Rejected", "comment": "..." }`.
 
-Pending query params: `role`, `take`, `skip`, keyset cursors.
+Pending query params: `role`, `page`, `pageSize` (max 100; legacy `take`/`skip` accepted), keyset cursors. Response envelope includes `items`, `page`, `pageSize`, `totalCount` (and legacy `total`/`skip`/`take`).
+
+Audit list (`GET /api/v1/audit/requests/{requestId}`) uses the same `page`/`pageSize`/`totalCount` envelope over request events.
 
 ### Saga
 

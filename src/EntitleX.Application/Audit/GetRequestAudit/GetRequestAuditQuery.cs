@@ -6,13 +6,18 @@ public sealed record GetRequestAuditQuery(
     Guid RequestId,
     int? Take = null,
     DateTimeOffset? AfterOccurredAtUtc = null,
-    Guid? AfterId = null) : IRequest<RequestAuditPageDto>;
+    Guid? AfterId = null,
+    int Page = 1,
+    int PageSize = 50) : IRequest<RequestAuditPageDto>;
 
 public sealed record RequestAuditPageDto(
     Guid RequestId,
     IReadOnlyList<AuditEventDto> Events,
     DateTimeOffset? NextOccurredAtUtc = null,
-    Guid? NextId = null);
+    Guid? NextId = null,
+    int Page = 1,
+    int PageSize = 50,
+    int TotalCount = 0);
 
 public sealed record AuditEventDto(
     Guid Id,

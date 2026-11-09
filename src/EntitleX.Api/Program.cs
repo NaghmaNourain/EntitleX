@@ -136,11 +136,17 @@ try
         }))
         .AllowAnonymous();
 
-    app.MapHealthChecks("/health/ready").AllowAnonymous();
+    app.MapHealthChecks("/health/ready", new HealthCheckOptions
+        {
+            ResponseWriter = HealthCheckResponseWriter.WriteAsync
+        })
+        .AllowAnonymous();
     app.MapHealthChecks("/health/providers", new HealthCheckOptions
-    {
-        Predicate = check => check.Tags.Contains("provider")
-    }).AllowAnonymous();
+        {
+            Predicate = check => check.Tags.Contains("provider"),
+            ResponseWriter = HealthCheckResponseWriter.WriteAsync
+        })
+        .AllowAnonymous();
     app.MapEntitleXPrometheusScrapingEndpoint()
         .RequireEntitleXMetricsAuth(app.Environment, app.Configuration);
 

@@ -23,8 +23,10 @@ public sealed class ListPendingApprovalsQueryHandler
         ListPendingApprovalsQuery query,
         CancellationToken cancellationToken)
     {
-        var take = Math.Clamp(query.Take, 1, 200);
+        var take = Math.Clamp(query.Take, 1, 100);
         var skip = Math.Max(0, query.Skip);
+        var pageNumber = query.Page > 0 ? query.Page : (skip / take) + 1;
+        var pageSize = query.PageSize > 0 ? Math.Clamp(query.PageSize, 1, 100) : take;
 
         // Fetch a bounded pending set, then filter/page in memory (pending queues are small).
         // Prefer keyset (AfterCreatedAtUtc + AfterApprovalCaseId) over Skip for stable paging.
@@ -69,7 +71,7 @@ public sealed class ListPendingApprovalsQueryHandler
         }
 
         var pageCases = pageSource.Take(take).ToList();
-        var page = pageCases
+        var items = pageCases
             .Select(c => new PendingApprovalSummaryDto(
                 c.Id,
                 c.RequestId.Value,
@@ -92,7 +94,16 @@ public sealed class ListPendingApprovalsQueryHandler
             nextId = last.Id;
         }
 
-        return new PendingApprovalsPageDto(ordered.Count, skip, take, page, nextCreated, nextId);
+        return new PendingApprovalsPageDto(
+            ordered.Count,
+            skip,
+            take,
+            items,
+            nextCreated,
+            nextId,
+            pageNumber,
+            pageSize,
+            ordered.Count);
     }
 
     /// <summary>

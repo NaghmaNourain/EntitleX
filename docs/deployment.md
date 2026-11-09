@@ -53,6 +53,30 @@ Dockerfiles under `infra/docker/images/` (build from repo root). See [infra/dock
 
 CI builds a subset of images without pushing (see below).
 
+## CORS and SPA hosting
+
+- **CORS is Development-only** (`FrontendDev` origins `localhost:5173` / `127.0.0.1:5173`). Non-Development hosts do **not** register browser CORS policies.
+- Production / Compose SPA assumes **same-origin** behind nginx (or ALB path routing): the browser talks to one origin; nginx serves the Vite build and proxies `/api` + `/health*` to the API. See `infra/docker/images/nginx-frontend.conf` (extend with `location /api/` → API upstream when co-hosting).
+- Cross-origin SPA + API in Production is intentionally unsupported without a new ADR.
+
+## EF Core migrations (Production)
+
+`Database:MigrateOnStartup` defaults to **`false`** in `appsettings.json` (Development sets it `true` for lab convenience).
+
+Production / staging path:
+
+1. Keep `Database:MigrateOnStartup=false` on API tasks.
+2. Run migrations from CI/CD or a one-shot migrate job before/alongside deploy:
+
+```bash
+dotnet ef database update \
+  --project src/EntitleX.Infrastructure \
+  --startup-project src/EntitleX.Api \
+  --connection "$ENTITLEX_PLATFORM_CONNECTION_STRING"
+```
+
+3. Confirm readiness with `GET /health/ready` (status + dependency names only).
+
 ## Secrets
 
 **Never commit secrets** (JWT signing keys, AWS access keys, connection-string passwords, SES credentials).
@@ -76,7 +100,7 @@ Triggers: `push`, `pull_request` (concurrency cancel-in-progress).
 
 | Job | What |
 |-----|------|
-| `build-test` | Restore, Release build, unit + integration + E2E scaffolding tests |
+| `build-test` | Restore, Release build, unit + integration + API WebApplicationFactory + E2E scaffolding tests |
 | `static-analysis` | Soft `dotnet format` gate, analyzer build, `terraform fmt -check` |
 | `frontend` | Node 22, `npm ci`, `npm run build` |
 | `docker-images` | Build API / sample worker / CloudShield / frontend images (`push: false`); Trivy CRITICAL/HIGH gate on API image |
