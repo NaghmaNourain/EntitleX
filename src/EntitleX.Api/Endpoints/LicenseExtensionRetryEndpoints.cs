@@ -1,13 +1,15 @@
+using EntitleX.Api.Infrastructure;
 using EntitleX.Application.LicenseExtension.RetryFailed;
 using EntitleX.Infrastructure.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace EntitleX.Api.Endpoints;
 
 public static class LicenseExtensionRetryEndpoints
 {
-    public const string IdempotencyKeyHeader = "Idempotency-Key";
+    public const string IdempotencyKeyHeader = IdempotencyKeyHelper.HeaderName;
 
     public static IEndpointRouteBuilder MapLicenseExtensionRetryEndpoints(this IEndpointRouteBuilder app)
     {
@@ -18,12 +20,14 @@ public static class LicenseExtensionRetryEndpoints
             .WithName("RetryFailedLicenseExtensions")
             .WithOpenApi()
             .RequireAuthorization(AuthorizationPolicies.CanCreateRequests)
+            .RequireRateLimiting(RateLimitingExtensions.WritePolicy)
             .Produces(StatusCodes.Status201Created)
             .Produces(StatusCodes.Status200OK)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status409Conflict);
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         return app;
     }

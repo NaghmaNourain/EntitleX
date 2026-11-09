@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<OutboxPublisherService>();
         services.AddScoped<IConsumerIdempotencyStore, EfConsumerIdempotencyStore>();
         services.AddScoped<IRetryClaimStore, EfRetryClaimStore>();
+        services.AddScoped<IApiIdempotencyStore, EfApiIdempotencyStore>();
         services.AddScoped<IAuditEventStore, EfAuditEventStore>();
         services.AddScoped<IApprovalReminderStore, EfApprovalReminderStore>();
         services.AddScoped<IExpirationNotificationStore, EfExpirationNotificationStore>();

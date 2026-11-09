@@ -1,8 +1,10 @@
+using EntitleX.Api.Infrastructure;
 using EntitleX.Application.Ops.GetOpsSummary;
 using EntitleX.Application.Ops.ReplayPoisonOutbox;
 using EntitleX.Infrastructure.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace EntitleX.Api.Endpoints;
 
@@ -24,8 +26,10 @@ public static class OpsEndpoints
             .WithName("ReplayPoisonOutbox")
             .WithOpenApi()
             .RequireAuthorization(AuthorizationPolicies.CanManageReconciliation)
+            .RequireRateLimiting(RateLimitingExtensions.WritePolicy)
             .Produces(StatusCodes.Status200OK)
-            .ProducesProblem(StatusCodes.Status403Forbidden);
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         return app;
     }

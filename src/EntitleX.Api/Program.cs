@@ -85,6 +85,7 @@ try
     });
 
     builder.Services.AddProblemDetails();
+    builder.Services.AddEntitleXRateLimiting(builder.Configuration);
 
     if (builder.Environment.IsDevelopment())
     {
@@ -119,6 +120,7 @@ try
 
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseEntitleXRateLimiting();
 
     if (app.Environment.IsDevelopment())
     {

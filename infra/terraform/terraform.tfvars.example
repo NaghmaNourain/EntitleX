@@ -11,9 +11,12 @@ enable_nat_gateway = true
 enable_ecs_services = false   # flip true after container images are pushed
 enable_lambda_schedules = false
 
-rds_instance_class       = "db.t4g.micro"
-rds_allocated_storage_gb = 20
-rds_multi_az             = false
+rds_instance_class           = "db.t4g.micro"
+rds_allocated_storage_gb     = 20
+rds_multi_az                 = false
+rds_backup_retention_period  = 7
+# enable_alb = false
+# See terraform.tfvars.staging.example for a non-lab HA checklist.
 
 ses_from_address = "noreply@example.com"
 app_base_url     = "https://entitlex.example.com"

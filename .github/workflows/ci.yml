@@ -116,9 +116,19 @@ jobs:
           context: .
           file: infra/docker/images/Dockerfile.api
           push: false
+          load: true
           tags: entitlex-api:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Scan API image (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: entitlex-api:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
 
       - name: Build OutboxPublisher image
         uses: docker/build-push-action@v6

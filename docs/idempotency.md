@@ -122,9 +122,34 @@ Store: `EfRetryClaimStore` (`IRetryClaimStore`) — `FindByIdempotencyKeyAsync`,
 Requires `CanCreateRequests` (`RenewalRepresentative` or `PlatformAdmin`). The
 handler also re-checks those roles so MediatR callers cannot bypass the policy.
 
+## HTTP write idempotency (create / start / decide)
+
+These writes also require `Idempotency-Key`:
+
+| Method | Path | Operation scope |
+|--------|------|-----------------|
+| `POST` | `/api/v1/license-extension-requests/` | `license-extension.create` |
+| `POST` | `.../approval/start` | `approval.start` |
+| `POST` | `.../approval/decisions` | `approval.decide` |
+| `POST` | `/api/v1/license-extensions/{id}/retry-failed` | (retry store — see above) |
+
+Table `http_write_idempotency_records` (`IApiIdempotencyStore` / `EfApiIdempotencyStore`):
+
+| Column | Role |
+|--------|------|
+| `idempotency_key` | PK — client UUID |
+| `operation` | Write kind |
+| `actor_user_id` | Bound caller |
+| `request_fingerprint` | SHA-256 of canonical payload |
+| `resource_id` | Created/affected resource id for replay |
+
+Same key + same actor + same fingerprint → replay prior result. Key reuse with a different fingerprint/operation/actor → `409 Conflict`.
+
+Write endpoints also use ASP.NET sliding-window rate limiting (`RateLimiting:WritePermitLimit`, default 30/min per user).
+
 ## Related
 
 - `docs/saga-workflow.md` — forward recovery and item outcomes
 - `docs/event-contracts.md` — fulfillment / provider envelopes
 - `docs/reconciliation.md` — gate before retry
-- EF migration `SelectiveRetryIdempotency`
+- EF migrations `SelectiveRetryIdempotency`, `HttpWriteIdempotency`

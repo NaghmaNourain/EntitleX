@@ -1,6 +1,8 @@
+using EntitleX.Api.Infrastructure;
 using EntitleX.Application.Reconciliation.ManualReconcile;
 using EntitleX.Infrastructure.Identity;
 using MediatR;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace EntitleX.Api.Endpoints;
 
@@ -15,9 +17,11 @@ public static class ReconciliationEndpoints
             .WithName("ManualReconcileLicenseExtensionRequest")
             .WithOpenApi()
             .RequireAuthorization(AuthorizationPolicies.CanManageReconciliation)
+            .RequireRateLimiting(RateLimitingExtensions.WritePolicy)
             .Produces(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         return app;
     }

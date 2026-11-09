@@ -59,9 +59,15 @@ variable "rds_allocated_storage_gb" {
 }
 
 variable "rds_multi_az" {
-  description = "Enable Multi-AZ for RDS (higher cost)."
+  description = "Enable Multi-AZ for RDS (higher cost). Keep false for lab."
   type        = bool
   default     = false
+}
+
+variable "rds_backup_retention_period" {
+  description = "RDS automated backup retention days."
+  type        = number
+  default     = 7
 }
 
 variable "ecs_desired_count_api" {
@@ -146,6 +152,30 @@ variable "enable_ecs_services" {
   description = "When false, creates supporting infra (VPC/RDS/SQS/etc.) without ECS services (useful before images exist)."
   type        = bool
   default     = false
+}
+
+variable "enable_ecr" {
+  description = "Create ECR repositories (negligible cost; needed before image push)."
+  type        = bool
+  default     = true
+}
+
+variable "enable_alb" {
+  description = "Create a public ALB + target group for the API (adds cost). Keep false for lab."
+  type        = bool
+  default     = false
+}
+
+variable "enable_alb_https" {
+  description = "When true and alb_certificate_arn is set, listen on 443 and redirect HTTP→HTTPS."
+  type        = bool
+  default     = false
+}
+
+variable "alb_certificate_arn" {
+  description = "ACM certificate ARN for HTTPS listener (optional)."
+  type        = string
+  default     = ""
 }
 
 variable "enable_lambda_schedules" {

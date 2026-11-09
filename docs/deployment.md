@@ -79,13 +79,24 @@ Triggers: `push`, `pull_request` (concurrency cancel-in-progress).
 | `build-test` | Restore, Release build, unit + integration + E2E scaffolding tests |
 | `static-analysis` | Soft `dotnet format` gate, analyzer build, `terraform fmt -check` |
 | `frontend` | Node 22, `npm ci`, `npm run build` |
-| `docker-images` | Build API / sample worker / CloudShield / frontend images (`push: false`) |
+| `docker-images` | Build API / sample worker / CloudShield / frontend images (`push: false`); Trivy CRITICAL/HIGH gate on API image |
+
+Also: `.github/workflows/codeql.yml` (C# + JS/TS on `main` / PRs + weekly) and `.github/dependabot.yml` (NuGet, npm, Actions, Docker — weekly).
 
 Integration tests use `DockerFact` — skip cleanly when Docker is unavailable.
 
 ### Manual AWS deploy — `.github/workflows/deploy-aws.yml`
 
-`workflow_dispatch` only (environment protection recommended). OIDC → `AWS_DEPLOY_ROLE_ARN`. Plan by default; apply gated by input. Reminder step: populate Secrets Manager and push images before `enable_ecs_services=true`.
+`workflow_dispatch` only (environment protection recommended). OIDC → `AWS_DEPLOY_ROLE_ARN`. Plan by default; apply gated by input.
+
+| Input | Default | Purpose |
+|-------|---------|---------|
+| `push_images` | `false` | Build/push API, workers, simulators to ECR |
+| `enable_ecs_services` | `false` | Create/update ECS services |
+| `enable_alb` | `false` | Public ALB (cost) + attach API target group when ECS is on |
+| `apply` | `false` | Run `terraform apply` |
+
+Populate Secrets Manager before enabling ECS. ECR repositories are created when `enable_ecr=true` (default).
 
 ## EventBridge schedules (stub + Terraform)
 
@@ -102,3 +113,7 @@ Local hosts: [lambdas.md](lambdas.md).
 ## Cost pointer
 
 Read **[infra/terraform/COST.md](../infra/terraform/COST.md)** before `terraform apply`. Guidance: tear down when idle; keep ECS/Lambda gated off until images and secrets exist; avoid NAT unless required.
+
+## HA / DR
+
+Lab defaults keep `rds_multi_az=false`. For a non-lab checklist see `infra/terraform/terraform.tfvars.staging.example` and the operator runbook **[runbooks/dr-rds.md](runbooks/dr-rds.md)** (RPO/RTO guidance, Multi-AZ enable steps, snapshot restore drill).
