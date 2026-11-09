@@ -27,3 +27,14 @@ variable "services" {
   }))
   default = {}
 }
+
+variable "api_target_group_arn" {
+  description = "Optional ALB target group ARN for the api service."
+  type        = string
+  default     = ""
+}
+
+variable "api_container_port" {
+  type    = number
+  default = 8080
+}
