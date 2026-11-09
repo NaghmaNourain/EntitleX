@@ -137,10 +137,7 @@ public static class OpenTelemetryHostingExtensions
     }
 
     /// <summary>Maps Prometheus scrape endpoint at <c>/metrics</c> for AspNetCore hosts.</summary>
-    public static IEndpointRouteBuilder MapEntitleXPrometheusScrapingEndpoint(
-        this IEndpointRouteBuilder endpoints)
-    {
+    public static IEndpointConventionBuilder MapEntitleXPrometheusScrapingEndpoint(
+        this IEndpointRouteBuilder endpoints) =>
         endpoints.MapPrometheusScrapingEndpoint();
-        return endpoints;
-    }
 }

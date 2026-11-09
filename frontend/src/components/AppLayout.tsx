@@ -35,8 +35,18 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
-  { to: '/entitlements', label: 'Entitlement search', icon: <SearchIcon /> },
-  { to: '/extensions/new', label: 'Create extension', icon: <PlaylistAddCheckIcon /> },
+  {
+    to: '/entitlements',
+    label: 'Entitlement search',
+    icon: <SearchIcon />,
+    roles: ['DealDeskManager', 'PlatformAdmin'],
+  },
+  {
+    to: '/extensions/new',
+    label: 'Create extension',
+    icon: <PlaylistAddCheckIcon />,
+    roles: ['RenewalRepresentative', 'PlatformAdmin'],
+  },
   { to: '/approvals/renewal-manager', label: 'Renewal Manager queue', icon: <GavelIcon />, roles: ['RenewalManager', 'PlatformAdmin'] },
   { to: '/approvals/deal-desk', label: 'Deal Desk queue', icon: <FactCheckIcon />, roles: ['DealDeskManager', 'PlatformAdmin'] },
   { to: '/fulfillment', label: 'Fulfillment progress', icon: <TimelineIcon /> },

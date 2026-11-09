@@ -37,8 +37,9 @@ dotnet build EntitleX.sln
 docker compose up -d
 
 # 3. Vendor simulators (Development: migrate + seed; Kafka consumers on)
-dotnet run --project src/simulators/CloudShield/CloudShield.Api     # :5081
-dotnet run --project src/simulators/NetworkGuard/NetworkGuard.Api   # :5082
+# Bound to 127.0.0.1; require X-Api-Key matching Providers:*/ApiKey (lab default in appsettings).
+dotnet run --project src/simulators/CloudShield/CloudShield.Api     # 127.0.0.1:5081
+dotnet run --project src/simulators/NetworkGuard/NetworkGuard.Api   # 127.0.0.1:5082
 
 # 4. Control-plane API
 dotnet run --project src/EntitleX.Api                               # :5080
@@ -105,7 +106,8 @@ API Development already enables OIDC against Keycloak (`Oidc:Authority=http://lo
 
 #### 2) DevToken (Development only)
 
-Mint a seed token when `Jwt:EnableDevTokenEndpoint=true` **and** `ASPNETCORE_ENVIRONMENT=Development` (forced off in Production):
+Mint a seed token when `Jwt:EnableDevTokenEndpoint=true` **and** `ASPNETCORE_ENVIRONMENT=Development` (forced off in Production).
+Minting **`PlatformAdmin` also requires `Jwt:AllowDevPlatformAdmin=true`** (default `false`) — prefer Keycloak for admin labs.
 
 ```bash
 curl -s -X POST http://localhost:5080/api/v1/dev/tokens \
@@ -118,9 +120,11 @@ curl -s -X POST http://localhost:5080/api/v1/dev/tokens \
 | `RenewalRepresentative` | `user-rep-001` | `renewal.rep@entitlex.local` |
 | `RenewalManager` | `user-rm-001` | `renewal.manager@entitlex.local` |
 | `DealDeskManager` | `user-dd-001` | `dealdesk.manager@entitlex.local` |
-| `PlatformAdmin` | `user-admin-001` | `platform.admin@entitlex.local` |
+| `PlatformAdmin` | `user-admin-001` | `platform.admin@entitlex.local` (needs `AllowDevPlatformAdmin`) |
 
 Frontend shows the DevToken panel only when `VITE_ENABLE_DEV_TOKEN=true`.
+
+See [docs/adr/0002-lab-vs-production-auth.md](docs/adr/0002-lab-vs-production-auth.md) for lab vs production auth posture (actors bound to JWT, resource auth, simulator API keys, metrics/CORS/HSTS).
 
 #### 3) Cloud IdP (Entra / Auth0 / Cognito)
 
@@ -130,11 +134,12 @@ No code forks — set generic OIDC env vars (never commit secrets):
 |----------|---------|
 | `Oidc__Enabled` | `true` |
 | `Oidc__Authority` | Issuer URL (required in Production) |
-| `Oidc__Audience` | API audience / app id URI |
+| `Oidc__Audience` | API audience / app id URI (**required outside Development**) |
 | `Oidc__ClientId` | SPA client id (documentation / SPA) |
 | `Oidc__RoleClaimType` | Claim carrying roles (default `roles`) |
 | `Oidc__RoleMap__{IdPRole}` | Optional map → EntitleX role name |
 | `Jwt__EnableDevTokenEndpoint` | Must stay `false` in Production |
+| `Jwt__AllowDevPlatformAdmin` | Dev-only; default `false` |
 | `Jwt__SigningKey` | Only needed if DevToken is enabled (Development) |
 
 Frontend cloud SPA:
@@ -170,7 +175,7 @@ Use `Authorization: Bearer <accessToken>` for API calls.
 | Prometheus | `9090` | Scrapes API `/metrics` + workers `:9180–9183` |
 | Grafana | `3001` | `admin` / `admin` |
 
-App processes (not in Compose by default): API `:5080`, CloudShield `:5081`, NetworkGuard `:5082`, Vite `:5173`.
+App processes (not in Compose by default): API `:5080`, CloudShield `127.0.0.1:5081`, NetworkGuard `127.0.0.1:5082`, Vite `:5173`. Keep simulators on a private network in shared labs.
 
 ## Documentation index
 

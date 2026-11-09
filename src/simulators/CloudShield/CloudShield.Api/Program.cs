@@ -4,6 +4,7 @@ using CloudShield.Infrastructure;
 using CloudShield.Infrastructure.Persistence;
 using CloudShield.Infrastructure.Seeding;
 using EntitleX.BuildingBlocks.Observability;
+using EntitleX.BuildingBlocks.Security;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -25,6 +26,7 @@ try
         .WriteTo.Console());
 
     builder.Services.AddEntitleXOpenTelemetry(builder.Configuration, "CloudShield.Api", isAspNetCoreHost: true);
+    builder.Services.AddSimulatorApiKeyAuth(builder.Configuration);
     builder.Services.AddCloudShieldApplication();
     builder.Services.AddCloudShieldInfrastructure(builder.Configuration);
 
@@ -36,6 +38,7 @@ try
     var app = builder.Build();
 
     app.UseSerilogRequestLogging();
+    app.UseSimulatorApiKeyAuth();
 
     if (app.Environment.IsDevelopment())
     {

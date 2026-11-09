@@ -50,13 +50,38 @@ export default function App() {
                 }
               >
                 <Route index element={<DashboardPage />} />
-                <Route path="entitlements" element={<EntitlementSearchPage />} />
+                <Route
+                  path="entitlements"
+                  element={
+                    <RequireAuth roles={['DealDeskManager', 'PlatformAdmin']}>
+                      <EntitlementSearchPage />
+                    </RequireAuth>
+                  }
+                />
                 <Route
                   path="entitlements/:provider/:entitlementId"
-                  element={<EntitlementDetailsPage />}
+                  element={
+                    <RequireAuth roles={['DealDeskManager', 'PlatformAdmin']}>
+                      <EntitlementDetailsPage />
+                    </RequireAuth>
+                  }
                 />
-                <Route path="extensions/bulk" element={<BulkSelectionPage />} />
-                <Route path="extensions/new" element={<CreateExtensionRequestPage />} />
+                <Route
+                  path="extensions/bulk"
+                  element={
+                    <RequireAuth roles={['RenewalRepresentative', 'PlatformAdmin']}>
+                      <BulkSelectionPage />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="extensions/new"
+                  element={
+                    <RequireAuth roles={['RenewalRepresentative', 'PlatformAdmin']}>
+                      <CreateExtensionRequestPage />
+                    </RequireAuth>
+                  }
+                />
                 <Route path="requests" element={<RequestDetailsPage />} />
                 <Route path="requests/:requestId" element={<RequestDetailsPage />} />
                 <Route

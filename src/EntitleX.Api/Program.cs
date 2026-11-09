@@ -3,6 +3,7 @@ using EntitleX.Api.Infrastructure;
 using EntitleX.Api.Middleware;
 using EntitleX.Application;
 using EntitleX.BuildingBlocks.Observability;
+using EntitleX.BuildingBlocks.Security;
 using EntitleX.Infrastructure;
 using EntitleX.Infrastructure.Identity;
 using EntitleX.Infrastructure.Persistence;
@@ -35,6 +36,8 @@ try
     builder.Services.AddEntitleXOpenTelemetry(builder.Configuration, "EntitleX.Api", isAspNetCoreHost: true);
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
+    builder.Services.Configure<MetricsBasicAuthOptions>(
+        builder.Configuration.GetSection(MetricsBasicAuthOptions.SectionName));
 
     if (builder.Environment.IsDevelopment())
     {
@@ -83,15 +86,18 @@ try
 
     builder.Services.AddProblemDetails();
 
-    builder.Services.AddCors(options =>
+    if (builder.Environment.IsDevelopment())
     {
-        options.AddPolicy("FrontendDev", policy =>
-            policy.WithOrigins(
-                    "http://localhost:5173",
-                    "http://127.0.0.1:5173")
-                .AllowAnyHeader()
-                .AllowAnyMethod());
-    });
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("FrontendDev", policy =>
+                policy.WithOrigins(
+                        "http://localhost:5173",
+                        "http://127.0.0.1:5173")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod());
+        });
+    }
 
     var app = builder.Build();
 
@@ -99,7 +105,18 @@ try
     app.UseSerilogRequestLogging();
     app.UseEntitleXExceptionHandler();
 
-    app.UseCors("FrontendDev");
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+        app.UseHsts();
+        app.UseEntitleXSecurityHeaders();
+    }
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseCors("FrontendDev");
+    }
+
     app.UseAuthentication();
     app.UseAuthorization();
 
@@ -122,7 +139,8 @@ try
     {
         Predicate = check => check.Tags.Contains("provider")
     }).AllowAnonymous();
-    app.MapEntitleXPrometheusScrapingEndpoint();
+    app.MapEntitleXPrometheusScrapingEndpoint()
+        .RequireEntitleXMetricsAuth(app.Environment, app.Configuration);
 
     app.MapLicenseExtensionEndpoints();
     app.MapLicenseExtensionRetryEndpoints();

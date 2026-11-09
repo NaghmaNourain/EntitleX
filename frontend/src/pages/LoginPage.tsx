@@ -21,7 +21,7 @@ const ROLES: EntitleXRole[] = [
   'RenewalRepresentative',
   'RenewalManager',
   'DealDeskManager',
-  'PlatformAdmin',
+  'PlatformAdmin', // requires Jwt:AllowDevPlatformAdmin=true on the API
 ]
 
 export function LoginPage() {
@@ -115,7 +115,9 @@ export function LoginPage() {
             >
               <Alert severity="info">
                 DevToken panel is shown when <code>VITE_ENABLE_DEV_TOKEN=true</code> and the API
-                runs in Development with <code>Jwt:EnableDevTokenEndpoint</code>.
+                runs in Development with <code>Jwt:EnableDevTokenEndpoint</code>.{' '}
+                <code>PlatformAdmin</code> also needs <code>Jwt:AllowDevPlatformAdmin=true</code>{' '}
+                (prefer Keycloak for admin).
               </Alert>
 
               <FormControl fullWidth required>

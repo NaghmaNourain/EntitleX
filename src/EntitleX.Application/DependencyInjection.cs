@@ -1,5 +1,6 @@
 using System.Reflection;
 using EntitleX.Application.Abstractions;
+using EntitleX.Application.Authorization;
 using EntitleX.Application.Common.Behaviors;
 using EntitleX.Application.EntitlementAggregation;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
@@ -26,6 +27,7 @@ public static class DependencyInjection
 
         services.AddValidatorsFromAssembly(assembly);
 
+        services.AddScoped<IResourceAuthorizationService, ResourceAuthorizationService>();
         services.AddScoped<IEntitlementAggregationService, EntitlementAggregationService>();
         services.AddScoped<IReconciliationGate, ReconciliationGate>();
         services.AddScoped<IReconciliationService, ReconciliationService>();

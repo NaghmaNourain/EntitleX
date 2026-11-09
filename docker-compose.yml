@@ -1,6 +1,11 @@
 # EntitleX local infrastructure (messaging + Keycloak IdP)
 # Usage: docker compose up -d
 # Validate: docker compose config
+#
+# Vendor simulators (CloudShield :5081, NetworkGuard :5082) are NOT Compose services.
+# They run on the host bound to 127.0.0.1 only (see launchSettings) and require
+# SimulatorAuth:ApiKey. Shared labs must keep them on a private network — never publish
+# simulator ports to the public internet.
 
 name: entitlex
 

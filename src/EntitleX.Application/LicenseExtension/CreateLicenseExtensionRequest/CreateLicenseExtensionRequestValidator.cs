@@ -8,10 +8,6 @@ public sealed class CreateLicenseExtensionRequestValidator
 {
     public CreateLicenseExtensionRequestValidator()
     {
-        RuleFor(x => x.RequestedBy)
-            .NotEmpty()
-            .MaximumLength(256);
-
         RuleFor(x => x.ExtensionNumber)
             .MaximumLength(64)
             .When(x => x.ExtensionNumber is not null);

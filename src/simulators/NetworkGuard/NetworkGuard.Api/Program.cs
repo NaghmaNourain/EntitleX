@@ -1,4 +1,5 @@
 using EntitleX.BuildingBlocks.Observability;
+using EntitleX.BuildingBlocks.Security;
 using Microsoft.EntityFrameworkCore;
 using NetworkGuard.Api.Endpoints;
 using NetworkGuard.Application;
@@ -25,6 +26,7 @@ try
         .WriteTo.Console());
 
     builder.Services.AddEntitleXOpenTelemetry(builder.Configuration, "NetworkGuard.Api", isAspNetCoreHost: true);
+    builder.Services.AddSimulatorApiKeyAuth(builder.Configuration);
     builder.Services.AddNetworkGuardApplication();
     builder.Services.AddNetworkGuardInfrastructure(builder.Configuration);
 
@@ -36,6 +38,7 @@ try
     var app = builder.Build();
 
     app.UseSerilogRequestLogging();
+    app.UseSimulatorApiKeyAuth();
 
     if (app.Environment.IsDevelopment())
     {

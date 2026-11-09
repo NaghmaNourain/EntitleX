@@ -9,18 +9,25 @@ namespace EntitleX.Application.Approval.GetApproval;
 public sealed class GetApprovalQueryHandler : IRequestHandler<GetApprovalQuery, ApprovalCaseDto>
 {
     private readonly IApprovalCaseRepository _approvalRepository;
+    private readonly IResourceAuthorizationService _authorization;
 
-    public GetApprovalQueryHandler(IApprovalCaseRepository approvalRepository)
+    public GetApprovalQueryHandler(
+        IApprovalCaseRepository approvalRepository,
+        IResourceAuthorizationService authorization)
     {
         _approvalRepository = approvalRepository;
+        _authorization = authorization;
     }
 
     public async Task<ApprovalCaseDto> Handle(
         GetApprovalQuery query,
         CancellationToken cancellationToken)
     {
+        var requestId = RequestId.From(query.RequestId);
+        await _authorization.EnsureCanReadRequestAsync(requestId, cancellationToken);
+
         var approvalCase = await _approvalRepository.GetByRequestIdAsync(
-            RequestId.From(query.RequestId),
+            requestId,
             cancellationToken);
 
         if (approvalCase is null)

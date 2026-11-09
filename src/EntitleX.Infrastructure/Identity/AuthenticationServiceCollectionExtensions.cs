@@ -36,6 +36,12 @@ public static class AuthenticationServiceCollectionExtensions
                 Environments.Production,
                 StringComparison.OrdinalIgnoreCase);
 
+        var isDevelopment = environment?.IsDevelopment() == true
+            || string.Equals(
+                configuration["ASPNETCORE_ENVIRONMENT"],
+                Environments.Development,
+                StringComparison.OrdinalIgnoreCase);
+
         if (isProduction)
         {
             // Force-disable DevToken regardless of config drift.
@@ -66,17 +72,25 @@ public static class AuthenticationServiceCollectionExtensions
                 "Jwt:EnableDevTokenEndpoint requires Jwt:SigningKey (≥32 characters).");
         }
 
+        // H6: outside Development, OIDC must fail closed on audience.
+        if (useOidc && !isDevelopment && string.IsNullOrWhiteSpace(oidc.Audience))
+        {
+            throw new InvalidOperationException(
+                "Oidc:Audience is required outside Development when OIDC is enabled. " +
+                "Empty audience would disable ValidateAudience.");
+        }
+
         services.AddHttpContextAccessor();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddScoped<Application.Abstractions.ICurrentUser, HttpCurrentUser>();
 
         if (useOidc && useDevJwt)
         {
-            AddDualJwtBearer(services, jwt, oidc);
+            AddDualJwtBearer(services, jwt, oidc, isDevelopment);
         }
         else if (useOidc)
         {
-            AddOidcOnlyJwtBearer(services, oidc);
+            AddOidcOnlyJwtBearer(services, oidc, isDevelopment);
         }
         else
         {
@@ -118,11 +132,14 @@ public static class AuthenticationServiceCollectionExtensions
         return services;
     }
 
-    private static void AddOidcOnlyJwtBearer(IServiceCollection services, OidcOptions oidc)
+    private static void AddOidcOnlyJwtBearer(
+        IServiceCollection services,
+        OidcOptions oidc,
+        bool isDevelopment)
     {
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options => ConfigureOidcJwtBearer(options, oidc));
+            .AddJwtBearer(options => ConfigureOidcJwtBearer(options, oidc, isDevelopment));
     }
 
     private static void AddDevOnlyJwtBearer(IServiceCollection services, JwtOptions jwt)
@@ -135,7 +152,8 @@ public static class AuthenticationServiceCollectionExtensions
     private static void AddDualJwtBearer(
         IServiceCollection services,
         JwtOptions jwt,
-        OidcOptions oidc)
+        OidcOptions oidc,
+        bool isDevelopment)
     {
         services
             .AddAuthentication(options =>
@@ -160,7 +178,7 @@ public static class AuthenticationServiceCollectionExtensions
                     return DevBearerScheme;
                 };
             })
-            .AddJwtBearer(OidcBearerScheme, options => ConfigureOidcJwtBearer(options, oidc))
+            .AddJwtBearer(OidcBearerScheme, options => ConfigureOidcJwtBearer(options, oidc, isDevelopment))
             .AddJwtBearer(DevBearerScheme, options => ConfigureDevJwtBearer(options, jwt));
     }
 
@@ -185,8 +203,14 @@ public static class AuthenticationServiceCollectionExtensions
         }
     }
 
-    private static void ConfigureOidcJwtBearer(JwtBearerOptions options, OidcOptions oidc)
+    private static void ConfigureOidcJwtBearer(
+        JwtBearerOptions options,
+        OidcOptions oidc,
+        bool isDevelopment)
     {
+        // Development may omit audience for Keycloak lab tokens; non-Development always validates.
+        var requireAudience = !isDevelopment || !string.IsNullOrWhiteSpace(oidc.Audience);
+
         options.Authority = oidc.Authority.TrimEnd('/');
         options.RequireHttpsMetadata = true;
         options.SaveToken = true;
@@ -194,7 +218,7 @@ public static class AuthenticationServiceCollectionExtensions
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidateAudience = !string.IsNullOrWhiteSpace(oidc.Audience),
+            ValidateAudience = requireAudience,
             ValidAudience = string.IsNullOrWhiteSpace(oidc.Audience) ? null : oidc.Audience,
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1),

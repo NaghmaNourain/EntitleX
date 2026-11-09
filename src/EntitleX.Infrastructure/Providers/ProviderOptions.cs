@@ -13,6 +13,12 @@ public sealed class ProviderEndpointOptions
 {
     public string BaseUrl { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Shared secret sent as <c>X-Api-Key</c> to vendor simulators.
+    /// Must match <c>SimulatorAuth:ApiKey</c> on CloudShield / NetworkGuard.
+    /// </summary>
+    public string ApiKey { get; set; } = string.Empty;
+
     /// <summary>Overall attempt timeout for a single HTTP call.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 
