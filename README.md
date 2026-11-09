@@ -8,7 +8,7 @@ Enterprise license-extension platform (portfolio). Orchestrates extension reques
 
 - **Modular control-plane API** (`EntitleX.Api`) with Clean Architecture layers — see [docs/architecture.md](docs/architecture.md), [docs/system-design.md](docs/system-design.md)
 - **DDD aggregates**: `LicenseExtensionRequest`, `ApprovalCase`, durable `LicenseExtensionSaga` (forward recovery only)
-- **JWT Bearer + RBAC** (`RenewalRepresentative`, `RenewalManager`, `DealDeskManager`, `PlatformAdmin`)
+- **JWT Bearer + RBAC** (`RenewalRepresentative`, `RenewalManager`, `DealDeskManager`, `PlatformAdmin`) with optional **OIDC** (Keycloak locally; Entra/Auth0/Cognito via config)
 - **Transactional outbox** → SQS fulfillment → Kafka provider commands → simulator results → saga settlement
 - **Selective retry** with `LogicalOperationId` / `AttemptId` / `ParentId` lineage and DB-backed idempotency
 - **Reconciliation** before blind retry (probe provider status; never POST when Unknown/NotFound)
@@ -33,7 +33,7 @@ Enterprise license-extension platform (portfolio). Orchestrates extension reques
 dotnet restore EntitleX.sln
 dotnet build EntitleX.sln
 
-# 2. Start Compose infra (Postgres, Kafka, LocalStack SQS+SES, Mailpit, Jaeger, Prometheus, Grafana)
+# 2. Start Compose infra (Keycloak, Postgres, Kafka, LocalStack SQS+SES, Mailpit, Jaeger, Prometheus, Grafana)
 docker compose up -d
 
 # 3. Vendor simulators (Development: migrate + seed; Kafka consumers on)
@@ -81,9 +81,31 @@ terraform init && terraform plan
 
 Secrets (JWT, connection strings) go into Secrets Manager **outside** Terraform — never commit them. Details: [docs/deployment.md](docs/deployment.md).
 
-### Auth (Development)
+### Auth
 
-Mint a seed token (`Jwt:EnableDevTokenEndpoint=true` in Development):
+Three local/cloud modes share the same ASP.NET policies and role names.
+
+#### 1) Keycloak (Compose — preferred local IdP)
+
+```bash
+docker compose up -d keycloak   # http://localhost:8080 (admin / admin — lab only)
+# Realm `entitlex` is imported from infra/docker/keycloak/realm-entitlex.json
+```
+
+| Username | Password | Role |
+|----------|----------|------|
+| `renewal.rep` | `demo` | `RenewalRepresentative` |
+| `renewal.manager` | `demo` | `RenewalManager` |
+| `dealdesk.manager` | `demo` | `DealDeskManager` |
+| `platform.admin` | `demo` | `PlatformAdmin` |
+
+SPA PKCE client: `entitlex-spa` → API audience `entitlex-api`. Frontend defaults in `frontend/.env.development`.
+
+API Development already enables OIDC against Keycloak (`Oidc:Authority=http://localhost:8080/realms/entitlex`).
+
+#### 2) DevToken (Development only)
+
+Mint a seed token when `Jwt:EnableDevTokenEndpoint=true` **and** `ASPNETCORE_ENVIRONMENT=Development` (forced off in Production):
 
 ```bash
 curl -s -X POST http://localhost:5080/api/v1/dev/tokens \
@@ -98,7 +120,33 @@ curl -s -X POST http://localhost:5080/api/v1/dev/tokens \
 | `DealDeskManager` | `user-dd-001` | `dealdesk.manager@entitlex.local` |
 | `PlatformAdmin` | `user-admin-001` | `platform.admin@entitlex.local` |
 
-Use `Authorization: Bearer <accessToken>`. Production must set a strong `Jwt__SigningKey` (≥32 chars).
+Frontend shows the DevToken panel only when `VITE_ENABLE_DEV_TOKEN=true`.
+
+#### 3) Cloud IdP (Entra / Auth0 / Cognito)
+
+No code forks — set generic OIDC env vars (never commit secrets):
+
+| Variable | Purpose |
+|----------|---------|
+| `Oidc__Enabled` | `true` |
+| `Oidc__Authority` | Issuer URL (required in Production) |
+| `Oidc__Audience` | API audience / app id URI |
+| `Oidc__ClientId` | SPA client id (documentation / SPA) |
+| `Oidc__RoleClaimType` | Claim carrying roles (default `roles`) |
+| `Oidc__RoleMap__{IdPRole}` | Optional map → EntitleX role name |
+| `Jwt__EnableDevTokenEndpoint` | Must stay `false` in Production |
+| `Jwt__SigningKey` | Only needed if DevToken is enabled (Development) |
+
+Frontend cloud SPA:
+
+| Variable | Purpose |
+|----------|---------|
+| `VITE_OIDC_AUTHORITY` | Same authority as API |
+| `VITE_OIDC_CLIENT_ID` | Public SPA client |
+| `VITE_OIDC_AUDIENCE` | Optional audience hint |
+| `VITE_ENABLE_DEV_TOKEN` | `false` outside local labs |
+
+Use `Authorization: Bearer <accessToken>` for API calls.
 
 ### Approval bands
 
@@ -113,6 +161,7 @@ Use `Authorization: Bearer <accessToken>`. Production must set a strong `Jwt__Si
 
 | Service | Ports | Notes |
 |---------|-------|-------|
+| Keycloak | `8080` | Realm `entitlex`; admin UI `admin`/`admin` (lab only) |
 | Postgres | `5432` | User/pass `entitlex` / `entitlex`; DBs `entitlex_platform`, `cloudshield`, `networkguard` |
 | Kafka | `9092` | KRaft |
 | LocalStack | `4566` | SQS + SES |

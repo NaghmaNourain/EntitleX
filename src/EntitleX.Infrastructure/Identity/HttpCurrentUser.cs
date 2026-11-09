@@ -31,9 +31,24 @@ public sealed class HttpCurrentUser : ICurrentUser
         Principal?.FindFirstValue(ClaimTypes.Email)
         ?? Principal?.FindFirstValue("email");
 
-    public IReadOnlyCollection<string> Roles =>
-        Principal?.FindAll(ClaimTypes.Role).Select(c => c.Value).ToArray()
-        ?? Array.Empty<string>();
+    public IReadOnlyCollection<string> Roles
+    {
+        get
+        {
+            if (Principal is null)
+            {
+                return Array.Empty<string>();
+            }
+
+            var fromRoleClaim = Principal.FindAll(ClaimTypes.Role).Select(c => c.Value);
+            var fromRoles = Principal.FindAll("roles").Select(c => c.Value);
+            return fromRoleClaim
+                .Concat(fromRoles)
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+    }
 
     public bool IsInRole(string role) =>
         Roles.Contains(role, StringComparer.OrdinalIgnoreCase);

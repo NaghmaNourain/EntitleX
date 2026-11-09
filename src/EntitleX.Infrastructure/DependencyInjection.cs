@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 
 namespace EntitleX.Infrastructure;
 
@@ -23,7 +24,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment? environment = null)
     {
         var connectionString = configuration.GetConnectionString("EntitleXPlatform")
             ?? throw new InvalidOperationException(
@@ -69,7 +71,7 @@ public static class DependencyInjection
         services.AddTransient<IProviderOperationStatusClient, CloudShieldOperationStatusClient>();
         services.AddTransient<IProviderOperationStatusClient, NetworkGuardOperationStatusClient>();
 
-        services.AddEntitleXAuthentication(configuration);
+        services.AddEntitleXAuthentication(configuration, environment);
         services.AddEntitleXEmail(configuration);
         services.AddScheduledNotificationJobs(configuration);
 

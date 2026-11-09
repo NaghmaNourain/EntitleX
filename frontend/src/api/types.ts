@@ -21,7 +21,10 @@ export interface AuthUser {
   userId: string
   displayName: string
   email: string
+  /** Primary role used for UI affordances (first EntitleX role on the token). */
   role: EntitleXRole
+  /** All EntitleX roles present on the token (OIDC may grant more than one). */
+  roles?: EntitleXRole[]
 }
 
 export interface NormalizedEntitlement {

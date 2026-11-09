@@ -9,8 +9,12 @@ export function RequireAuth({
   children: React.ReactNode
   roles?: EntitleXRole[]
 }) {
-  const { isAuthenticated, hasRole } = useAuth()
+  const { isAuthenticated, isLoading, hasRole } = useAuth()
   const location = useLocation()
+
+  if (isLoading) {
+    return null
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />

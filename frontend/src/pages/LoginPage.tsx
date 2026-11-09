@@ -1,6 +1,7 @@
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import Divider from '@mui/material/Divider'
 import FormControl from '@mui/material/FormControl'
 import FormHelperText from '@mui/material/FormHelperText'
 import InputLabel from '@mui/material/InputLabel'
@@ -24,20 +25,27 @@ const ROLES: EntitleXRole[] = [
 ]
 
 export function LoginPage() {
-  const { isAuthenticated, loginWithRole } = useAuth()
+  const { isAuthenticated, isLoading, oidcEnabled, enableDevToken, loginWithOidc, loginWithRole } =
+    useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? '/'
   const [role, setRole] = useState<EntitleXRole>('RenewalRepresentative')
 
-  const mutation = useMutation({
+  const oidcMutation = useMutation({
+    mutationFn: () => loginWithOidc(),
+  })
+
+  const devMutation = useMutation({
     mutationFn: () => loginWithRole(role),
     onSuccess: () => navigate(from, { replace: true }),
   })
 
-  if (isAuthenticated) {
+  if (!isLoading && isAuthenticated) {
     return <Navigate to="/" replace />
   }
+
+  const noLoginMethods = !oidcEnabled && !enableDevToken
 
   return (
     <Box
@@ -71,48 +79,83 @@ export function LoginPage() {
           EntitleX
         </Typography>
         <Typography color="text.secondary" sx={{ mb: 3 }}>
-          Dev login mints a Phase 4 JWT via <code>POST /api/v1/dev/tokens</code>.
+          Sign in with your identity provider
+          {enableDevToken ? ', or use a Development DevToken.' : '.'}
         </Typography>
 
-        <Alert severity="info" sx={{ mb: 3 }}>
-          Available only when the API runs in Development with{' '}
-          <code>Jwt:EnableDevTokenEndpoint</code>.
-        </Alert>
+        <Stack spacing={2.5}>
+          {oidcEnabled && (
+            <>
+              <Button
+                variant="contained"
+                size="large"
+                disabled={oidcMutation.isPending || isLoading}
+                aria-busy={oidcMutation.isPending}
+                onClick={() => oidcMutation.mutate()}
+              >
+                {oidcMutation.isPending ? 'Redirecting…' : 'Sign in with SSO'}
+              </Button>
+              <ErrorAlert error={oidcMutation.error} title="SSO login failed" />
+              <Typography variant="body2" color="text.secondary">
+                Local Keycloak users use password <code>demo</code> (lab only).
+              </Typography>
+            </>
+          )}
 
-        <Stack spacing={2.5} component="form"
-          onSubmit={(e) => {
-            e.preventDefault()
-            mutation.mutate()
-          }}
-        >
-          <FormControl fullWidth required>
-            <InputLabel id="role-label">Role</InputLabel>
-            <Select
-              labelId="role-label"
-              label="Role"
-              value={role}
-              onChange={(e) => setRole(e.target.value as EntitleXRole)}
+          {oidcEnabled && enableDevToken && <Divider>or</Divider>}
+
+          {enableDevToken && (
+            <Stack
+              spacing={2.5}
+              component="form"
+              onSubmit={(e) => {
+                e.preventDefault()
+                devMutation.mutate()
+              }}
             >
-              {ROLES.map((r) => (
-                <MenuItem key={r} value={r}>
-                  {r}
-                </MenuItem>
-              ))}
-            </Select>
-            <FormHelperText>Maps to seeded local users for RBAC testing</FormHelperText>
-          </FormControl>
+              <Alert severity="info">
+                DevToken panel is shown when <code>VITE_ENABLE_DEV_TOKEN=true</code> and the API
+                runs in Development with <code>Jwt:EnableDevTokenEndpoint</code>.
+              </Alert>
 
-          <ErrorAlert error={mutation.error} title="Login failed" />
+              <FormControl fullWidth required>
+                <InputLabel id="role-label">Role</InputLabel>
+                <Select
+                  labelId="role-label"
+                  label="Role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as EntitleXRole)}
+                >
+                  {ROLES.map((r) => (
+                    <MenuItem key={r} value={r}>
+                      {r}
+                    </MenuItem>
+                  ))}
+                </Select>
+                <FormHelperText>Maps to seeded local users for RBAC testing</FormHelperText>
+              </FormControl>
 
-          <Button
-            type="submit"
-            variant="contained"
-            size="large"
-            disabled={mutation.isPending}
-            aria-busy={mutation.isPending}
-          >
-            {mutation.isPending ? 'Signing in…' : 'Continue'}
-          </Button>
+              <ErrorAlert error={devMutation.error} title="DevToken login failed" />
+
+              <Button
+                type="submit"
+                variant="outlined"
+                size="large"
+                disabled={devMutation.isPending}
+                aria-busy={devMutation.isPending}
+              >
+                {devMutation.isPending ? 'Signing in…' : 'Continue with DevToken'}
+              </Button>
+            </Stack>
+          )}
+
+          {noLoginMethods && (
+            <Alert severity="warning">
+              No login methods configured. Set <code>VITE_OIDC_AUTHORITY</code> /{' '}
+              <code>VITE_OIDC_CLIENT_ID</code> for SSO, or <code>VITE_ENABLE_DEV_TOKEN=true</code>{' '}
+              for Development tokens.
+            </Alert>
+          )}
         </Stack>
       </Paper>
     </Box>

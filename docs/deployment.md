@@ -22,7 +22,7 @@ docker compose up -d
 # then run API, simulators, workers, lambdas, frontend — see root README
 ```
 
-Compose services: Postgres, Kafka, LocalStack, Mailpit, Jaeger, Prometheus, Grafana.  
+Compose services: Keycloak, Postgres, Kafka, LocalStack, Mailpit, Jaeger, Prometheus, Grafana.  
 App processes are **not** started by Compose by default.
 
 ### Optional AWS path
@@ -59,11 +59,12 @@ CI builds a subset of images without pushing (see below).
 
 | Secret | Local | AWS |
 |--------|-------|-----|
-| `Jwt:SigningKey` / `Jwt__SigningKey` | Dev appsettings / env (≥32 chars) | Secrets Manager shell; `put-secret-value` outside Terraform |
+| `Oidc:Authority` / client secrets | Keycloak Compose (`admin`/`admin`, user `demo`) — lab only | Entra/Auth0/Cognito tenant; set `Oidc__*` via env / Secrets Manager (never commit) |
+| `Jwt:SigningKey` / `Jwt__SigningKey` | Dev appsettings only when DevToken enabled (≥32 chars) | Not required when OIDC-only; DevToken must be off in Production |
 | Connection strings | Compose defaults (`entitlex`/`entitlex`) | Compose from RDS secret → `entitlex/connection-strings` JSON |
 | SQS/SES keys | LocalStack `test`/`test` | Task/Lambda IAM roles — no static keys in images |
 | Kafka bootstrap | `localhost:9092` | Secret `entitlex/kafka` (MSK/self-managed not created by Terraform) |
-| Grafana / Postgres Compose | `admin`/`admin`, `entitlex`/`entitlex` | Lab only; change for any shared environment |
+| Grafana / Postgres / Keycloak Compose | `admin`/`admin`, `entitlex`/`entitlex` | Lab only; change for any shared environment |
 
 LocalStack enables Secrets Manager in Compose but app code uses config/env locally.
 

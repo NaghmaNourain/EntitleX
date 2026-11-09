@@ -34,11 +34,12 @@ try
 
     builder.Services.AddEntitleXOpenTelemetry(builder.Configuration, "EntitleX.Api", isAspNetCoreHost: true);
     builder.Services.AddApplication();
-    builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 
     if (builder.Environment.IsDevelopment())
     {
-        builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+        // Local Keycloak and DevToken use HTTP metadata / loopback.
+        builder.Services.PostConfigureAll<JwtBearerOptions>(options =>
         {
             options.RequireHttpsMetadata = false;
         });

@@ -1,10 +1,31 @@
-# EntitleX local infrastructure (Phase 5 messaging: SQS + Kafka)
+# EntitleX local infrastructure (messaging + Keycloak IdP)
 # Usage: docker compose up -d
 # Validate: docker compose config
 
 name: entitlex
 
 services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: entitlex-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8080
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./infra/docker/keycloak/realm-entitlex.json:/opt/keycloak/data/import/realm-entitlex.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
   postgres:
     image: postgres:16-alpine
     container_name: entitlex-postgres
