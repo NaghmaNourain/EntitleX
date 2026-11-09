@@ -1,15 +1,24 @@
 # Rider lab run configurations
 
-Shared configs in [`.run/`](../.run/) start the local portfolio stack without treating the SPA as a .NET startup project.
+Shared configs live in both [`.run/`](../.run/) and [`.idea/runConfigurations/`](../.idea/runConfigurations/) (the latter is what most Rider versions show in the run dropdown).
 
 ## Use this
 
-1. Free host ports if another stack owns them (`untitled-postgres-1` → `:5432`, `untitled-keycloak-1` → `:8080`):
+1. Be on the branch that contains these files and pull:
+   ```bash
+   git fetch origin
+   git checkout cursor/ai-request-insights-040d
+   git pull
+   ls .idea/runConfigurations/Lab_Full_Stack.xml .run/Lab_Full_Stack.run.xml
+   ```
+2. In Rider: **File → Close Solution**, then reopen `EntitleX.sln` (or **File → Invalidate Caches** if the dropdown is stale).
+3. Free host ports if another stack owns them (`untitled-postgres-1` → `:5432`, `untitled-keycloak-1` → `:8080`):
    ```bash
    docker stop untitled-postgres-1 untitled-keycloak-1 2>/dev/null || true
    ```
-2. In Rider, select **Lab Full Stack** → Run.
-3. Open http://localhost:5173 (API `:5080`, CloudShield `127.0.0.1:5081`, NetworkGuard `127.0.0.1:5082`).
+4. Run-configuration dropdown (top right) → **Lab Full Stack** → Run.  
+   Also listed under **Run → Edit Configurations…**.
+5. Open http://localhost:5173 (API `:5080`, CloudShield `127.0.0.1:5081`, NetworkGuard `127.0.0.1:5082`).
 
 ## What Lab Full Stack starts
 
