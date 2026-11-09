@@ -390,6 +390,13 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("requires_deal_desk");
 
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("row_version");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -474,11 +481,14 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("LogicalOperationId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_saga_item_outcomes_logical_operation_id");
+                        .HasDatabaseName("ix_saga_item_outcomes_logical_operation_id");
 
                     b.HasIndex("SagaId")
                         .HasDatabaseName("ix_saga_item_outcomes_saga_id");
+
+                    b.HasIndex("SagaId", "LogicalOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_saga_item_outcomes_saga_logical_operation_id");
 
                     b.ToTable("saga_item_outcomes", "public");
                 });
@@ -705,6 +715,10 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid>("AttemptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("attempt_id");
+
                     b.Property<string>("EntitlementId")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -750,9 +764,13 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("LogicalOperationId")
-                        .IsUnique();
+                        .HasDatabaseName("ix_fulfillment_item_results_logical_operation_id");
 
                     b.HasIndex("RequestId");
+
+                    b.HasIndex("LogicalOperationId", "AttemptId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_fulfillment_item_results_logical_attempt");
 
                     b.ToTable("fulfillment_item_results", "public");
                 });

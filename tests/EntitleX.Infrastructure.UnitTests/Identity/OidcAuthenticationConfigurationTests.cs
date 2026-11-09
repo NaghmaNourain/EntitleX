@@ -64,6 +64,43 @@ public sealed class OidcAuthenticationConfigurationTests
         Assert.NotNull(sp.GetRequiredService<IJwtTokenService>());
     }
 
+    [Fact]
+    public void Staging_requires_oidc_and_refuses_hmac_only()
+    {
+        var services = new ServiceCollection();
+        var config = BuildConfig(new Dictionary<string, string?>
+        {
+            ["Oidc:Enabled"] = "false",
+            ["Jwt:SigningKey"] = "EntitleX-Staging-Would-Come-From-Secrets-Mgr-32+",
+            ["Jwt:EnableDevTokenEndpoint"] = "true"
+        });
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            services.AddEntitleXAuthentication(config, new StubHostEnvironment(Environments.Staging)));
+
+        Assert.Contains("Non-Development", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Staging_with_oidc_disables_dev_token()
+    {
+        var services = new ServiceCollection();
+        var config = BuildConfig(new Dictionary<string, string?>
+        {
+            ["Oidc:Enabled"] = "true",
+            ["Oidc:Authority"] = "https://login.example.com/",
+            ["Oidc:Audience"] = "entitlex-api",
+            ["Jwt:EnableDevTokenEndpoint"] = "true",
+            ["Jwt:SigningKey"] = "EntitleX-Should-Not-Matter-In-Staging-Key-32+"
+        });
+
+        services.AddEntitleXAuthentication(config, new StubHostEnvironment(Environments.Staging));
+        using var sp = services.BuildServiceProvider();
+        var jwt = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<JwtOptions>>().Value;
+
+        Assert.False(jwt.EnableDevTokenEndpoint);
+    }
+
     private static IConfiguration BuildConfig(Dictionary<string, string?> values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 

@@ -94,6 +94,12 @@ public sealed class EntitlementAggregationServiceTests
             return Task.FromResult(_items);
         }
 
+        public Task<NormalizedEntitlementDto?> GetByEntitlementIdAsync(
+            string entitlementId,
+            string correlationId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(_items.FirstOrDefault(i => i.EntitlementId == entitlementId));
+
         public Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(_succeed);
     }

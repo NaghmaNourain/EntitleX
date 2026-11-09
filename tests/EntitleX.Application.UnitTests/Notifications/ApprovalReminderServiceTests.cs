@@ -1,7 +1,7 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Models;
 using EntitleX.Application.Notifications;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;

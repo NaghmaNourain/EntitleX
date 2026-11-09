@@ -5,9 +5,15 @@ variable "aws_region" {
 }
 
 variable "environment" {
-  description = "Deployment environment name (e.g. lab, staging)."
+  description = "Deployment environment name used for resource tags/names (e.g. lab, staging)."
   type        = string
   default     = "lab"
+}
+
+variable "aspnetcore_environment" {
+  description = "ASPNETCORE_ENVIRONMENT for ECS/Lambda hosts. Keep separate from the lab tag; default Production so OIDC guards apply."
+  type        = string
+  default     = "Production"
 }
 
 variable "name_prefix" {

@@ -1,4 +1,4 @@
-namespace EntitleX.BuildingBlocks.Ids;
+namespace EntitleX.SharedKernel.Ids;
 
 /// <summary>Provider-scoped entitlement identifier (opaque string from vendor systems).</summary>
 public readonly record struct EntitlementId(string Value)

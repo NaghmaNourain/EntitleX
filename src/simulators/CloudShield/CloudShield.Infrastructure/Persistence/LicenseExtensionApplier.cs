@@ -3,7 +3,7 @@ using CloudShield.Application.Models;
 using CloudShield.Application.Operations;
 using CloudShield.Domain.Common;
 using CloudShield.Domain.Operations;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 

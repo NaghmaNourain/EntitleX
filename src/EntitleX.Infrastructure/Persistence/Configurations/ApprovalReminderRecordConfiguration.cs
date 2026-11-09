@@ -1,4 +1,4 @@
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Infrastructure.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,4 +1,4 @@
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Common;
 using EntitleX.Domain.LicenseExtension.Events;
 
@@ -48,7 +48,12 @@ public sealed class LicenseExtensionRequest : AggregateRoot
                 LicenseExtensionRequestStatus.Failed
             ],
             [LicenseExtensionRequestStatus.Fulfilled] = [],
-            [LicenseExtensionRequestStatus.Failed] = [],
+            // Corrective repair when reconciliation promotes Failed → success path.
+            [LicenseExtensionRequestStatus.Failed] =
+            [
+                LicenseExtensionRequestStatus.PartiallyFulfilled,
+                LicenseExtensionRequestStatus.Fulfilled
+            ],
             [LicenseExtensionRequestStatus.Cancelled] = []
         };
 
@@ -348,7 +353,8 @@ public sealed class LicenseExtensionRequest : AggregateRoot
     {
         if (Status is not (
             LicenseExtensionRequestStatus.InFulfillment or
-            LicenseExtensionRequestStatus.PartiallyFulfilled))
+            LicenseExtensionRequestStatus.PartiallyFulfilled or
+            LicenseExtensionRequestStatus.Failed))
         {
             throw new DomainException(
                 $"Cannot complete fulfillment from status '{Status}'.");

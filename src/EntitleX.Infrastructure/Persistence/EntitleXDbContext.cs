@@ -54,19 +54,12 @@ public sealed class EntitleXDbContext : DbContext, IUnitOfWork
     {
         foreach (var entry in ChangeTracker.Entries<LicenseExtensionRequest>())
         {
-            if (entry.State is EntityState.Modified or EntityState.Added)
-            {
-                var rowVersion = entry.Property(e => e.RowVersion);
-                if (entry.State == EntityState.Added)
-                {
-                    rowVersion.CurrentValue = 0;
-                }
-                else
-                {
-                    rowVersion.OriginalValue = entry.Entity.RowVersion;
-                    rowVersion.CurrentValue = unchecked(entry.Entity.RowVersion + 1);
-                }
-            }
+            BumpRowVersion(entry);
+        }
+
+        foreach (var entry in ChangeTracker.Entries<LicenseExtensionSaga>())
+        {
+            BumpRowVersion(entry);
         }
 
         return await base.SaveChangesAsync(cancellationToken);
@@ -77,5 +70,27 @@ public sealed class EntitleXDbContext : DbContext, IUnitOfWork
         modelBuilder.HasDefaultSchema("public");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(EntitleXDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
+    }
+
+    private static void BumpRowVersion<TEntity>(
+        Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<TEntity> entry)
+        where TEntity : class
+    {
+        if (entry.State is not (EntityState.Modified or EntityState.Added))
+        {
+            return;
+        }
+
+        var rowVersion = entry.Property("RowVersion");
+        if (entry.State == EntityState.Added)
+        {
+            rowVersion.CurrentValue = 0u;
+        }
+        else
+        {
+            var current = (uint)(rowVersion.CurrentValue ?? 0u);
+            rowVersion.OriginalValue = current;
+            rowVersion.CurrentValue = unchecked(current + 1);
+        }
     }
 }

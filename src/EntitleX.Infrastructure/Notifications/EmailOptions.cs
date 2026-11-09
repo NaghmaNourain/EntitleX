@@ -43,11 +43,12 @@ public sealed class SmtpEmailOptions
 
 public sealed class SesEmailOptions
 {
-    public string ServiceUrl { get; set; } = "http://localhost:4566";
+    /// <summary>Empty = real AWS (default credential chain). LocalStack URL in Development only.</summary>
+    public string ServiceUrl { get; set; } = string.Empty;
 
     public string Region { get; set; } = "us-east-1";
 
-    public string AccessKey { get; set; } = "test";
+    public string AccessKey { get; set; } = string.Empty;
 
-    public string SecretKey { get; set; } = "test";
+    public string SecretKey { get; set; } = string.Empty;
 }

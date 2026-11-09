@@ -8,6 +8,7 @@ using EntitleX.Messaging.Abstractions;
 using EntitleX.Messaging.Contracts;
 using EntitleX.Messaging.Metrics;
 using EntitleX.Messaging.Options;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -21,20 +22,50 @@ public sealed class SqsMessagePublisher : ISqsMessagePublisher, IAsyncDisposable
     private readonly Dictionary<string, string> _queueUrls = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _resolveLock = new(1, 1);
 
-    public SqsMessagePublisher(IOptions<MessagingOptions> options, ILogger<SqsMessagePublisher> logger)
+    public SqsMessagePublisher(
+        IOptions<MessagingOptions> options,
+        ILogger<SqsMessagePublisher> logger,
+        IHostEnvironment environment)
     {
         _options = options.Value.Sqs;
         _logger = logger;
+        _client = CreateClient(_options, environment);
+    }
 
-        var credentials = new BasicAWSCredentials(_options.AccessKey, _options.SecretKey);
+    public static IAmazonSQS CreateClient(SqsOptions options, IHostEnvironment environment)
+    {
         var config = new AmazonSQSConfig
         {
-            RegionEndpoint = RegionEndpoint.GetBySystemName(_options.Region),
-            ServiceURL = _options.ServiceUrl,
-            AuthenticationRegion = _options.Region
+            RegionEndpoint = RegionEndpoint.GetBySystemName(options.Region)
         };
 
-        _client = new AmazonSQSClient(credentials, config);
+        var hasCustomEndpoint = !string.IsNullOrWhiteSpace(options.ServiceUrl);
+        if (hasCustomEndpoint)
+        {
+            config.ServiceURL = options.ServiceUrl;
+            config.AuthenticationRegion = options.Region;
+        }
+
+        var accessKey = options.AccessKey?.Trim() ?? string.Empty;
+        var secretKey = options.SecretKey?.Trim() ?? string.Empty;
+        var usesTestKeys = string.Equals(accessKey, "test", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(secretKey, "test", StringComparison.OrdinalIgnoreCase);
+
+        if (usesTestKeys && !environment.IsDevelopment())
+        {
+            throw new InvalidOperationException(
+                "Messaging:Sqs AccessKey/SecretKey must not be 'test' outside Development. " +
+                "Leave ServiceUrl empty to use the default AWS credential chain (task role / instance profile).");
+        }
+
+        if (!hasCustomEndpoint)
+        {
+            // Real AWS: rely on the default credential chain (ECS task role, IRSA, etc.).
+            return new AmazonSQSClient(config);
+        }
+
+        // LocalStack / custom endpoint: static keys are expected in Development.
+        return new AmazonSQSClient(new BasicAWSCredentials(accessKey, secretKey), config);
     }
 
     public async Task PublishAsync(

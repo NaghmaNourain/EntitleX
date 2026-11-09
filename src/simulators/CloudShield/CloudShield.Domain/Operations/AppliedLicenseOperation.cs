@@ -1,5 +1,5 @@
 using CloudShield.Domain.Common;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 
 namespace CloudShield.Domain.Operations;
 

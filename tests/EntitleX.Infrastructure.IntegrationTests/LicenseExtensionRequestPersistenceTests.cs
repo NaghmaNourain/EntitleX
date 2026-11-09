@@ -1,4 +1,4 @@
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Infrastructure.Persistence;
 using EntitleX.Infrastructure.Persistence.Repositories;

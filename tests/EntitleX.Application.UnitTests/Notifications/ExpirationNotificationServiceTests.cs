@@ -2,7 +2,7 @@ using EntitleX.Application.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Models;
 using EntitleX.Application.Notifications;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -145,6 +145,12 @@ public sealed class ExpirationNotificationServiceTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<NormalizedEntitlementDto>>(
                 entitlements.Where(e => e.CustomerId == customerId).ToList());
+
+        public Task<NormalizedEntitlementDto?> GetByEntitlementIdAsync(
+            string entitlementId,
+            string correlationId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(entitlements.FirstOrDefault(e => e.EntitlementId == entitlementId));
 
         public Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(true);

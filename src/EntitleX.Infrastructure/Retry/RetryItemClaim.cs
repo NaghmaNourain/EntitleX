@@ -1,4 +1,4 @@
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 
 namespace EntitleX.Infrastructure.Retry;
 

@@ -1,4 +1,4 @@
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Saga;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -81,6 +81,12 @@ public sealed class LicenseExtensionSagaConfiguration : IEntityTypeConfiguration
 
         builder.Property(x => x.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
+            .IsRequired();
+
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("row_version")
+            .IsConcurrencyToken()
+            .HasDefaultValue(0u)
             .IsRequired();
 
         builder.Navigation(x => x.Transitions)

@@ -1,9 +1,9 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Fulfillment;
-using EntitleX.BuildingBlocks.Ids;
+
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Messaging.Contracts;
-using EntitleX.Messaging.Options;
 using Microsoft.Extensions.Options;
 
 namespace EntitleX.Application.UnitTests.Fulfillment;
@@ -30,9 +30,9 @@ public sealed class FulfillmentOutboxServiceTests
         request.RecordApproval("hash");
 
         var writer = new CapturingOutboxWriter();
-        var options = Options.Create(new MessagingOptions
+        var options = Options.Create(new FulfillmentEnqueueOptions
         {
-            Sqs = { FulfillmentQueueName = "entitlex-fulfillment" }
+            FulfillmentQueueName = "entitlex-fulfillment"
         });
 
         var service = new FulfillmentOutboxService(writer, options);

@@ -1,5 +1,5 @@
 using EntitleX.Application.Abstractions;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Saga;
 
 namespace EntitleX.Application.LicenseExtension.Retry;
@@ -48,7 +48,13 @@ public sealed class ReconciliationGate : IReconciliationGate
             return null;
         }
 
-        var localByLogical = local.ToDictionary(o => o.LogicalOperationId);
+        // Prefer Succeeded attempt when multiple ledger rows share a LogicalOperationId.
+        var localByLogical = local
+            .GroupBy(o => o.LogicalOperationId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.FirstOrDefault(o => o.Succeeded)
+                     ?? g.OrderByDescending(o => o.RecordedAtUtc).First());
         var mismatches = new List<Guid>();
 
         foreach (var outcome in saga.ItemOutcomes)

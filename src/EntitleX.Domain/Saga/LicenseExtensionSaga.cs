@@ -1,4 +1,4 @@
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Common;
 
@@ -77,7 +77,12 @@ public sealed class LicenseExtensionSaga : AggregateRoot
                 SagaState.ReconciliationRequired
             ],
             [SagaState.Completed] = [],
-            [SagaState.Failed] = [],
+            // Corrective repair only: provider ConfirmedApplied after a false Failed.
+            [SagaState.Failed] =
+            [
+                SagaState.PartiallyCompleted,
+                SagaState.Completed
+            ],
             [SagaState.Rejected] = []
         };
 
@@ -130,6 +135,9 @@ public sealed class LicenseExtensionSaga : AggregateRoot
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public DateTimeOffset UpdatedAtUtc { get; private set; }
+
+    /// <summary>Optimistic concurrency token (persisted as row_version).</summary>
+    public uint RowVersion { get; private set; }
 
     public IReadOnlyList<SagaTransition> Transitions => _transitions.AsReadOnly();
 
@@ -382,8 +390,9 @@ public sealed class LicenseExtensionSaga : AggregateRoot
 
     /// <summary>
     /// Phase 8 corrective repair when the provider confirms Applied for a
-    /// LogicalOperationId (including when local previously recorded Failed).
-    /// Idempotent when the item is already Succeeded (including terminal sagas).
+    /// LogicalOperationId (including when local previously recorded Failed,
+    /// even if the saga is already terminal Failed). Never demotes Succeeded.
+    /// Idempotent when the item is already Succeeded.
     /// </summary>
     public void CorrectItemSucceededFromReconciliation(
         LogicalOperationId logicalOperationId,
@@ -397,9 +406,31 @@ public sealed class LicenseExtensionSaga : AggregateRoot
             return;
         }
 
-        EnsureNotTerminal();
+        if (State == SagaState.Rejected)
+        {
+            throw new DomainException("Cannot repair item outcomes on a Rejected saga.");
+        }
+
+        if (State == SagaState.Completed)
+        {
+            // Terminal success path — nothing to repair into.
+            return;
+        }
+
+        if (State != SagaState.Failed)
+        {
+            EnsureNotTerminal();
+        }
+
         item.CorrectToSucceeded(now);
         UpdatedAtUtc = now;
+
+        if (State == SagaState.Failed)
+        {
+            ReaggregateAfterFailedRepair(correlationId, now);
+            return;
+        }
+
         TryAggregateAfterItemUpdate(correlationId, now);
     }
 
@@ -776,6 +807,43 @@ public sealed class LicenseExtensionSaga : AggregateRoot
         if (AllItemsTerminal || _itemOutcomes.Any(i => i.Status == SagaItemOutcomeStatus.Uncertain))
         {
             AggregateStatus(correlationId, now);
+        }
+    }
+
+    /// <summary>
+    /// Re-opens a terminal Failed saga after a corrective Succeeded repair.
+    /// </summary>
+    private void ReaggregateAfterFailedRepair(string? correlationId, DateTimeOffset now)
+    {
+        if (!AllItemsTerminal)
+        {
+            return;
+        }
+
+        var succeeded = SucceededItemCount;
+        var failed = FailedItemCount;
+
+        if (failed == 0 && succeeded > 0)
+        {
+            TransitionTo(
+                SagaState.Completed,
+                "Corrective repair: all items Succeeded after provider ConfirmedApplied",
+                actor: "reconciliation",
+                correlationId,
+                now);
+            ClearTimeout(now);
+            return;
+        }
+
+        if (succeeded > 0)
+        {
+            TransitionTo(
+                SagaState.PartiallyCompleted,
+                "Corrective repair: mixed outcomes after provider ConfirmedApplied",
+                actor: "reconciliation",
+                correlationId,
+                now);
+            ClearTimeout(now);
         }
     }
 

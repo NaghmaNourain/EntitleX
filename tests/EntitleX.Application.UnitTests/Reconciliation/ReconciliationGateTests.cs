@@ -1,6 +1,6 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.LicenseExtension.Retry;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;
@@ -34,6 +34,7 @@ public sealed class ReconciliationGateTests
                 request.Id.Value,
                 failed.Id.Value,
                 failed.LogicalOperationId.Value,
+                failed.AttemptId.Value,
                 failed.EntitlementId.Value,
                 "CloudShield",
                 Succeeded: true,

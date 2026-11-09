@@ -2,6 +2,7 @@ using EntitleX.Application;
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Application.Notifications;
+using EntitleX.Application.Fulfillment;
 using EntitleX.Infrastructure.Audit;
 using EntitleX.Infrastructure.Identity;
 using EntitleX.Infrastructure.Notifications;
@@ -61,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<ProviderResultProcessor>();
 
         services.AddEntitleXMessaging(configuration);
+        BindFulfillmentEnqueueOptions(services, configuration);
         services.AddHostedService<Observability.BacklogMetricsProbe>();
         services.AddHostedService<Observability.SqsDepthProbeHostedService>();
 
@@ -121,9 +123,25 @@ public static class DependencyInjection
         services.AddTransient<IProviderOperationStatusClient, NetworkGuardOperationStatusClient>();
         services.AddSagaOrchestration();
         services.AddEntitleXMessaging(configuration);
+        BindFulfillmentEnqueueOptions(services, configuration);
         services.AddHostedService<Observability.BacklogMetricsProbe>();
         services.AddHostedService<Observability.SqsDepthProbeHostedService>();
         return services;
+    }
+
+    private static void BindFulfillmentEnqueueOptions(
+        IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // Application-owned enqueue options — bound from Messaging:Sqs without referencing adapters.
+        services.Configure<FulfillmentEnqueueOptions>(options =>
+        {
+            var queue = configuration["Messaging:Sqs:FulfillmentQueueName"];
+            if (!string.IsNullOrWhiteSpace(queue))
+            {
+                options.FulfillmentQueueName = queue;
+            }
+        });
     }
 
     /// <summary>

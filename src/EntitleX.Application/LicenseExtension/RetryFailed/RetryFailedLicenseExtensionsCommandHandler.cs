@@ -1,7 +1,7 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Common.Exceptions;
 using EntitleX.Application.LicenseExtension.Models;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Identity;
@@ -155,7 +155,7 @@ public sealed class RetryFailedLicenseExtensionsCommandHandler
         var approvalCase = ApprovalCase.Open(retry.Id, maxDays, band);
         ApplyInitialApprovalTransition(retry, band, reuseApproval);
 
-        _ = await _sagaOrchestrator.StartForRequestAsync(
+        var retrySaga = await _sagaOrchestrator.StartForRequestAsync(
             retry,
             band,
             command.CorrelationId,
@@ -167,9 +167,10 @@ public sealed class RetryFailedLicenseExtensionsCommandHandler
                 ? parsed
                 : (Guid?)null;
             // Outbox enqueue stays inside the short PG unit of work — no Kafka/SQS/HTTP here.
-            // Orchestrator retains the in-scope saga started above (pre-SaveChanges).
+            // Pass the saga started above (pre-SaveChanges); repository Local is a safety net.
             await _sagaOrchestrator.DispatchFulfillmentAsync(
                 retry,
+                retrySaga,
                 correlation,
                 causationId: null,
                 cancellationToken);

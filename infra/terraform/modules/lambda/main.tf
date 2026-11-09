@@ -16,7 +16,7 @@ resource "aws_lambda_function" "approval_reminder" {
 
   environment {
     variables = {
-      ASPNETCORE_ENVIRONMENT = var.environment
+      ASPNETCORE_ENVIRONMENT = var.aspnetcore_environment
       Email__Provider        = "Ses"
       Email__FromAddress     = var.ses_from_address
       Email__AppBaseUrl      = var.app_base_url
@@ -42,7 +42,7 @@ resource "aws_lambda_function" "expiration_notification" {
 
   environment {
     variables = {
-      ASPNETCORE_ENVIRONMENT = var.environment
+      ASPNETCORE_ENVIRONMENT = var.aspnetcore_environment
       Email__Provider        = "Ses"
       Email__FromAddress     = var.ses_from_address
       Email__AppBaseUrl      = var.app_base_url

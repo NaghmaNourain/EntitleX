@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Reconciliation;
 using EntitleX.Application.Reconciliation.Models;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;
@@ -113,10 +113,12 @@ public sealed class ReconciliationServiceTests
             ProviderOperationLookupKind.ConfirmedApplied);
 
         var local = new InMemoryLocalOutcomes();
+        var failedItem = request.Items.Single(i => i.LogicalOperationId.Equals(failedOp));
         local.ByLogical[failedOp.Value] = new LocalFulfillmentOutcome(
             request.Id.Value,
-            request.Items.Single(i => i.LogicalOperationId.Equals(failedOp)).Id.Value,
+            failedItem.Id.Value,
             failedOp.Value,
+            failedItem.AttemptId.Value,
             "ent-fail",
             "CloudShield",
             Succeeded: true,
@@ -373,6 +375,14 @@ public sealed class ReconciliationServiceTests
 
         public Task DispatchFulfillmentAsync(
             LicenseExtensionRequest request,
+            Guid? correlationId = null,
+            Guid? causationId = null,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task DispatchFulfillmentAsync(
+            LicenseExtensionRequest request,
+            LicenseExtensionSaga saga,
             Guid? correlationId = null,
             Guid? causationId = null,
             CancellationToken cancellationToken = default) =>

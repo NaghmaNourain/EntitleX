@@ -1,6 +1,6 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Reconciliation.Models;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.BuildingBlocks.Observability;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Domain.Saga;
@@ -289,6 +289,7 @@ public sealed class ReconciliationService : IReconciliationService
                 request.Id.Value,
                 requestItem.Id.Value,
                 outcome.LogicalOperationId.Value,
+                requestItem.AttemptId.Value,
                 requestItem.EntitlementId.Value,
                 providerName,
                 Succeeded: true,
@@ -357,6 +358,7 @@ public sealed class ReconciliationService : IReconciliationService
                 request.Id.Value,
                 requestItem.Id.Value,
                 outcome.LogicalOperationId.Value,
+                requestItem.AttemptId.Value,
                 requestItem.EntitlementId.Value,
                 providerName,
                 Succeeded: false,
@@ -470,7 +472,8 @@ public sealed class ReconciliationService : IReconciliationService
 
         if (request.Status is not (
             LicenseExtensionRequestStatus.InFulfillment or
-            LicenseExtensionRequestStatus.PartiallyFulfilled))
+            LicenseExtensionRequestStatus.PartiallyFulfilled or
+            LicenseExtensionRequestStatus.Failed))
         {
             return Task.CompletedTask;
         }

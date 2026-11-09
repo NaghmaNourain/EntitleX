@@ -30,34 +30,33 @@ public static class AuthenticationServiceCollectionExtensions
         var oidc = configuration.GetSection(OidcOptions.SectionName).Get<OidcOptions>()
             ?? new OidcOptions();
 
-        var isProduction = environment?.IsProduction() == true
-            || string.Equals(
-                configuration["ASPNETCORE_ENVIRONMENT"],
-                Environments.Production,
-                StringComparison.OrdinalIgnoreCase);
-
         var isDevelopment = environment?.IsDevelopment() == true
             || string.Equals(
                 configuration["ASPNETCORE_ENVIRONMENT"],
                 Environments.Development,
                 StringComparison.OrdinalIgnoreCase);
 
-        if (isProduction)
+        // Outside Development (Production, Staging, lab hosts mistagged as lab, etc.):
+        // OIDC is required; DevToken and HMAC-only boot are refused.
+        if (!isDevelopment)
         {
-            // Force-disable DevToken regardless of config drift.
             jwt.EnableDevTokenEndpoint = false;
             services.PostConfigure<JwtOptions>(options => options.EnableDevTokenEndpoint = false);
 
             if (!oidc.Enabled || string.IsNullOrWhiteSpace(oidc.Authority))
             {
                 throw new InvalidOperationException(
-                    "Production requires Oidc:Enabled=true and Oidc:Authority. " +
-                    "DevToken HMAC auth is not permitted in Production.");
+                    "Non-Development hosts require Oidc:Enabled=true and Oidc:Authority. " +
+                    "DevToken / HMAC-only auth is not permitted outside Development.");
             }
         }
 
         var useOidc = oidc.Enabled && !string.IsNullOrWhiteSpace(oidc.Authority);
-        var useDevJwt = !string.IsNullOrWhiteSpace(jwt.SigningKey) && jwt.SigningKey.Length >= 32;
+        // Dev HMAC bearer is Development-only; SigningKey may still exist for local tooling
+        // but must not register a dual/HMAC scheme outside Development.
+        var useDevJwt = isDevelopment
+            && !string.IsNullOrWhiteSpace(jwt.SigningKey)
+            && jwt.SigningKey.Length >= 32;
 
         if (!useOidc && !useDevJwt)
         {
@@ -66,13 +65,19 @@ public static class AuthenticationServiceCollectionExtensions
                 "Set secrets via environment variables — never commit production secrets.");
         }
 
+        if (jwt.EnableDevTokenEndpoint && !isDevelopment)
+        {
+            throw new InvalidOperationException(
+                "Jwt:EnableDevTokenEndpoint is only permitted in Development.");
+        }
+
         if (jwt.EnableDevTokenEndpoint && !useDevJwt)
         {
             throw new InvalidOperationException(
                 "Jwt:EnableDevTokenEndpoint requires Jwt:SigningKey (≥32 characters).");
         }
 
-        // H6: outside Development, OIDC must fail closed on audience.
+        // Outside Development, OIDC must fail closed on audience.
         if (useOidc && !isDevelopment && string.IsNullOrWhiteSpace(oidc.Audience))
         {
             throw new InvalidOperationException(
@@ -121,7 +126,11 @@ public static class AuthenticationServiceCollectionExtensions
 
             options.AddPolicy(
                 AuthorizationPolicies.CanReadApprovals,
-                policy => policy.RequireAuthenticatedUser());
+                policy => policy.RequireRole(
+                    Domain.Identity.EntitleXRoles.RenewalRepresentative,
+                    Domain.Identity.EntitleXRoles.RenewalManager,
+                    Domain.Identity.EntitleXRoles.DealDeskManager,
+                    Domain.Identity.EntitleXRoles.PlatformAdmin));
 
             options.AddPolicy(
                 AuthorizationPolicies.CanManageReconciliation,

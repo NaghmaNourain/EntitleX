@@ -1,7 +1,7 @@
 using CloudShield.Domain.Common;
 using CloudShield.Domain.Entitlements;
 using CloudShield.Domain.Operations;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 
 namespace CloudShield.Domain.UnitTests;
 

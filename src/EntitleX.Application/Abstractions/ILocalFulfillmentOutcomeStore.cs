@@ -1,4 +1,4 @@
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 
 namespace EntitleX.Application.Abstractions;
 
@@ -10,6 +10,7 @@ public sealed record LocalFulfillmentOutcome(
     Guid RequestId,
     Guid RequestItemId,
     Guid LogicalOperationId,
+    Guid AttemptId,
     string EntitlementId,
     string Provider,
     bool Succeeded,
@@ -19,6 +20,9 @@ public sealed record LocalFulfillmentOutcome(
 
 public interface ILocalFulfillmentOutcomeStore
 {
+    /// <summary>
+    /// Preferred outcome for a LogicalOperationId: Succeeded wins, else latest by RecordedAtUtc.
+    /// </summary>
     Task<LocalFulfillmentOutcome?> FindByLogicalOperationIdAsync(
         LogicalOperationId logicalOperationId,
         CancellationToken cancellationToken = default);
@@ -28,8 +32,8 @@ public interface ILocalFulfillmentOutcomeStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Idempotently records a corrective local outcome (unique on LogicalOperationId).
-    /// Returns false when a row already exists.
+    /// Idempotently records a local outcome (unique on LogicalOperationId + AttemptId).
+    /// Returns false when a row already exists for that attempt.
     /// </summary>
     Task<bool> TryRecordAsync(
         LocalFulfillmentOutcome outcome,

@@ -1,6 +1,6 @@
 using CloudShield.Application.Abstractions;
 using CloudShield.Domain.Operations;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using Microsoft.EntityFrameworkCore;
 
 namespace CloudShield.Infrastructure.Persistence.Repositories;

@@ -1,4 +1,4 @@
-namespace EntitleX.BuildingBlocks.Ids;
+namespace EntitleX.SharedKernel.Ids;
 
 /// <summary>Strongly typed identity for a license-extension request aggregate.</summary>
 public readonly record struct RequestId(Guid Value)

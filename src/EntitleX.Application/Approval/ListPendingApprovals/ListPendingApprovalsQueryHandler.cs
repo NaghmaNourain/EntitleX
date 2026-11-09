@@ -1,5 +1,6 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Domain.Approval;
+using EntitleX.Domain.Identity;
 using MediatR;
 
 namespace EntitleX.Application.Approval.ListPendingApprovals;
@@ -8,10 +9,14 @@ public sealed class ListPendingApprovalsQueryHandler
     : IRequestHandler<ListPendingApprovalsQuery, PendingApprovalsPageDto>
 {
     private readonly IApprovalCaseRepository _approvals;
+    private readonly ICurrentUser _currentUser;
 
-    public ListPendingApprovalsQueryHandler(IApprovalCaseRepository approvals)
+    public ListPendingApprovalsQueryHandler(
+        IApprovalCaseRepository approvals,
+        ICurrentUser currentUser)
     {
         _approvals = approvals;
+        _currentUser = currentUser;
     }
 
     public async Task<PendingApprovalsPageDto> Handle(
@@ -25,20 +30,24 @@ public sealed class ListPendingApprovalsQueryHandler
         // Prefer keyset (AfterCreatedAtUtc + AfterApprovalCaseId) over Skip for stable paging.
         var pending = await _approvals.ListPendingAsync(500, cancellationToken);
 
-        IEnumerable<ApprovalCase> filtered = pending;
-        if (!string.IsNullOrWhiteSpace(query.Role))
+        var allowedRoles = ResolveAllowedRoleFilters(query.Role);
+        // Empty allowed set means the caller has no stage visibility — never fall open to all.
+        IEnumerable<ApprovalCase> filtered = pending.Where(c =>
         {
-            var role = query.Role.Trim();
-            filtered = pending.Where(c =>
+            if (allowedRoles.Count == 0)
             {
-                var stage = c.CurrentStage;
-                return stage is not null
-                    && string.Equals(
-                        ApprovalRules.RoleName(stage.RequiredRole),
-                        role,
-                        StringComparison.OrdinalIgnoreCase);
-            });
-        }
+                return false;
+            }
+
+            var stage = c.CurrentStage;
+            if (stage is null)
+            {
+                return false;
+            }
+
+            var required = ApprovalRules.RoleName(stage.RequiredRole);
+            return allowedRoles.Contains(required, StringComparer.OrdinalIgnoreCase);
+        });
 
         var ordered = filtered
             .OrderBy(c => c.CreatedAtUtc)
@@ -84,5 +93,47 @@ public sealed class ListPendingApprovalsQueryHandler
         }
 
         return new PendingApprovalsPageDto(ordered.Count, skip, take, page, nextCreated, nextId);
+    }
+
+    /// <summary>
+    /// Ignore client Role when it is not in the caller's roles; default to the caller's
+    /// stage-capable roles so representatives cannot spoof into manager queues.
+    /// PlatformAdmin may filter any stage role (or omit Role for all pending).
+    /// </summary>
+    private HashSet<string> ResolveAllowedRoleFilters(string? requestedRole)
+    {
+        var callerRoles = _currentUser.Roles
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var isAdmin = callerRoles.Contains(EntitleXRoles.PlatformAdmin);
+        var stageCapable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (callerRoles.Contains(EntitleXRoles.RenewalManager) || isAdmin)
+        {
+            stageCapable.Add(EntitleXRoles.RenewalManager);
+        }
+
+        if (callerRoles.Contains(EntitleXRoles.DealDeskManager) || isAdmin)
+        {
+            stageCapable.Add(EntitleXRoles.DealDeskManager);
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestedRole))
+        {
+            var role = requestedRole.Trim();
+            if (isAdmin || callerRoles.Contains(role))
+            {
+                // Admin or genuine role holder may narrow to that role when it is a stage role.
+                if (string.Equals(role, EntitleXRoles.RenewalManager, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(role, EntitleXRoles.DealDeskManager, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new HashSet<string>(StringComparer.OrdinalIgnoreCase) { role };
+                }
+            }
+
+            // Spoofed / non-owned role: fall through to caller stage defaults (may be empty).
+        }
+
+        return stageCapable;
     }
 }

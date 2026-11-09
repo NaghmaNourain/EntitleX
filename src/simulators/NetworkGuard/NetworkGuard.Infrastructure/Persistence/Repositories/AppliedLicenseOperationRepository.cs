@@ -1,4 +1,4 @@
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using Microsoft.EntityFrameworkCore;
 using NetworkGuard.Application.Abstractions;
 using NetworkGuard.Domain.Operations;

@@ -1,8 +1,8 @@
 using EntitleX.Application.Abstractions;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.Application.Fulfillment;
 using EntitleX.Domain.LicenseExtension;
 using EntitleX.Messaging.Contracts;
-using EntitleX.Messaging.Options;
+using EntitleX.SharedKernel.Ids;
 using Microsoft.Extensions.Options;
 
 namespace EntitleX.Application.Fulfillment;
@@ -10,11 +10,11 @@ namespace EntitleX.Application.Fulfillment;
 public sealed class FulfillmentOutboxService : IFulfillmentOutboxService
 {
     private readonly IOutboxWriter _outboxWriter;
-    private readonly MessagingOptions _options;
+    private readonly FulfillmentEnqueueOptions _options;
 
     public FulfillmentOutboxService(
         IOutboxWriter outboxWriter,
-        IOptions<MessagingOptions> options)
+        IOptions<FulfillmentEnqueueOptions> options)
     {
         _outboxWriter = outboxWriter;
         _options = options.Value;
@@ -61,7 +61,7 @@ public sealed class FulfillmentOutboxService : IFulfillmentOutboxService
             envelope,
             new OutboxDispatchTarget(
                 OutboxTransport.Sqs,
-                _options.Sqs.FulfillmentQueueName),
+                _options.FulfillmentQueueName),
             cancellationToken);
     }
 }

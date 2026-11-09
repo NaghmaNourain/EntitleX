@@ -1,4 +1,4 @@
-namespace EntitleX.BuildingBlocks.Ids;
+namespace EntitleX.SharedKernel.Ids;
 
 /// <summary>
 /// Stable logical operation identity retained across selective-retry attempts

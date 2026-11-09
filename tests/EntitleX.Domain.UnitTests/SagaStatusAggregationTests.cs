@@ -1,4 +1,4 @@
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using EntitleX.Domain.Common;
 using EntitleX.Domain.LicenseExtension;
@@ -94,6 +94,36 @@ public sealed class SagaStatusAggregationTests
 
         saga.RecordItemFailed(op2, "E", "fail");
         Assert.Equal(SagaState.PartiallyCompleted, saga.State);
+    }
+
+    [Fact]
+    public void CorrectItemSucceeded_FromTerminalFailed_ReopensToCompleted()
+    {
+        var (saga, op1, _) = CreateProcessingSaga(itemCount: 1);
+        saga.RecordItemFailed(op1, "E", "false failed");
+        Assert.Equal(SagaState.Failed, saga.State);
+
+        saga.CorrectItemSucceededFromReconciliation(op1);
+
+        Assert.Equal(SagaState.Completed, saga.State);
+        Assert.Equal(
+            SagaItemOutcomeStatus.Succeeded,
+            saga.ItemOutcomes.Single().Status);
+    }
+
+    [Fact]
+    public void CorrectItemSucceeded_FromTerminalFailed_Mixed_ReopensToPartiallyCompleted()
+    {
+        var (saga, op1, op2) = CreateProcessingSaga(itemCount: 2);
+        saga.RecordItemFailed(op1, "E1", "a");
+        saga.RecordItemFailed(op2, "E2", "b");
+        Assert.Equal(SagaState.Failed, saga.State);
+
+        saga.CorrectItemSucceededFromReconciliation(op1);
+
+        Assert.Equal(SagaState.PartiallyCompleted, saga.State);
+        Assert.Equal(1, saga.SucceededItemCount);
+        Assert.Equal(1, saga.FailedItemCount);
     }
 
     private static (LicenseExtensionSaga Saga, LogicalOperationId Op1, LogicalOperationId Op2)

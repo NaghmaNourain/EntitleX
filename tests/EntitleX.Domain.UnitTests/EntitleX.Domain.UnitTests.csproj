@@ -19,7 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\EntitleX.Domain\EntitleX.Domain.csproj" />
-    <ProjectReference Include="..\..\src\EntitleX.BuildingBlocks\EntitleX.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\src\EntitleX.SharedKernel\EntitleX.SharedKernel.csproj" />
   </ItemGroup>
 
 </Project>

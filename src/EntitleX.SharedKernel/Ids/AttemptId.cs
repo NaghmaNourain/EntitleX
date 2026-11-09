@@ -1,4 +1,4 @@
-namespace EntitleX.BuildingBlocks.Ids;
+namespace EntitleX.SharedKernel.Ids;
 
 /// <summary>Per-attempt identity; new value on each selective-retry chain hop.</summary>
 public readonly record struct AttemptId(Guid Value)

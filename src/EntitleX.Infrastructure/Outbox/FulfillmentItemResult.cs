@@ -1,8 +1,8 @@
 namespace EntitleX.Infrastructure.Outbox;
 
 /// <summary>
-/// Minimal fulfillment outcome ledger (pre-saga). Unique on LogicalOperationId
-/// so completion/failure events are idempotent.
+/// Fulfillment outcome ledger. Unique on (LogicalOperationId, AttemptId) so
+/// selective retries (same LogicalOp, new AttemptId) can record a new outcome.
 /// </summary>
 public sealed class FulfillmentItemResult
 {
@@ -16,6 +16,7 @@ public sealed class FulfillmentItemResult
         Guid requestId,
         Guid requestItemId,
         Guid logicalOperationId,
+        Guid attemptId,
         string entitlementId,
         string provider,
         bool succeeded,
@@ -27,6 +28,7 @@ public sealed class FulfillmentItemResult
         RequestId = requestId;
         RequestItemId = requestItemId;
         LogicalOperationId = logicalOperationId;
+        AttemptId = attemptId;
         EntitlementId = entitlementId;
         Provider = provider;
         Succeeded = succeeded;
@@ -42,6 +44,8 @@ public sealed class FulfillmentItemResult
     public Guid RequestItemId { get; private set; }
 
     public Guid LogicalOperationId { get; private set; }
+
+    public Guid AttemptId { get; private set; }
 
     public string EntitlementId { get; private set; }
 

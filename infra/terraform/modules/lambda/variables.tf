@@ -1,5 +1,9 @@
 variable "name_prefix" { type = string }
 variable "environment" { type = string }
+variable "aspnetcore_environment" {
+  type    = string
+  default = "Production"
+}
 variable "enable" { type = bool }
 variable "lambda_role_arn" { type = string }
 variable "subnet_ids" { type = list(string) }

@@ -89,7 +89,7 @@ Options: `Messaging:Outbox` (`BatchSize`, `PollIntervalMilliseconds`, `LockDurat
 ## Delivery semantics
 
 - **At-least-once** on SQS and Kafka.
-- Consumers claim `(consumerName, idempotencyKey)` in `processed_messages` before side effects.
+- Consumers stage `(consumerName, idempotencyKey)` in `processed_messages` in the **same** unit of work as business side effects (claim-before-flush is incorrect). Provider-result keys use `result:{LogicalOperationId}:{AttemptId}`.
 - Fulfillment SQS: leave message on failure (visibility timeout retry); after repeated failures, move to DLQ.
 - Outbox publisher: `FOR UPDATE SKIP LOCKED`, exponential retry, `Poison` after `MaxAttempts`.
 - Flow summary: approval final → outbox (same PG txn) → `OutboxPublisher` → SQS → `FulfillmentCommandProcessor` → Kafka per-item commands → simulator consumers → results topic → `ProviderResultProcessor`.

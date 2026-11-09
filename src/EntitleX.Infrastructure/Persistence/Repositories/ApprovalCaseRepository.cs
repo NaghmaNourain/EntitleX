@@ -1,5 +1,5 @@
 using EntitleX.Application.Abstractions;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
 using Microsoft.EntityFrameworkCore;
 

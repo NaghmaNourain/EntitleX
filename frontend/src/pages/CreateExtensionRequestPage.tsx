@@ -55,7 +55,7 @@ export function CreateExtensionRequestPage() {
   function onSubmit(event: FormEvent) {
     event.preventDefault()
     if (!canCreate || cart.count === 0) return
-    if (extensionDays < 1 || extensionDays > 3650) return
+    if (extensionDays < 1 || extensionDays > 365) return
     mutation.mutate()
   }
 
@@ -95,8 +95,8 @@ export function CreateExtensionRequestPage() {
             value={extensionDays}
             onChange={(e) => setExtensionDays(Number(e.target.value))}
             required
-            inputProps={{ min: 1, max: 3650, 'aria-label': 'Extension days' }}
-            helperText="Applied uniformly from each entitlement’s current expiry"
+            inputProps={{ min: 1, max: 365, 'aria-label': 'Extension days' }}
+            helperText="1–365 days from each entitlement’s current expiry (domain max)"
           />
           <TextField
             label="Extension number (optional)"

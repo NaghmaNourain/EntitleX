@@ -1,8 +1,9 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Approval.Models;
 using EntitleX.Application.Common.Exceptions;
-using EntitleX.BuildingBlocks.Ids;
+using EntitleX.SharedKernel.Ids;
 using EntitleX.Domain.Approval;
+using EntitleX.Domain.Identity;
 using EntitleX.Domain.LicenseExtension;
 using MediatR;
 
@@ -16,25 +17,40 @@ public sealed class StartApprovalCommandHandler
     private readonly ILicenseExtensionSagaOrchestrator _sagaOrchestrator;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IApprovalNotificationService _notifications;
+    private readonly ICurrentUser _currentUser;
 
     public StartApprovalCommandHandler(
         ILicenseExtensionRequestRepository requestRepository,
         IApprovalCaseRepository approvalRepository,
         ILicenseExtensionSagaOrchestrator sagaOrchestrator,
         IUnitOfWork unitOfWork,
-        IApprovalNotificationService notifications)
+        IApprovalNotificationService notifications,
+        ICurrentUser currentUser)
     {
         _requestRepository = requestRepository;
         _approvalRepository = approvalRepository;
         _sagaOrchestrator = sagaOrchestrator;
         _unitOfWork = unitOfWork;
         _notifications = notifications;
+        _currentUser = currentUser;
     }
 
     public async Task<ApprovalCaseDto> Handle(
         StartApprovalCommand command,
         CancellationToken cancellationToken)
     {
+        if (!_currentUser.IsAuthenticated)
+        {
+            throw new ForbiddenException("Authentication is required to start approval.");
+        }
+
+        if (!_currentUser.IsInRole(EntitleXRoles.RenewalRepresentative)
+            && !_currentUser.IsInRole(EntitleXRoles.PlatformAdmin))
+        {
+            throw new ForbiddenException(
+                "Starting approval requires RenewalRepresentative or PlatformAdmin.");
+        }
+
         var requestId = RequestId.From(command.RequestId);
         var existing = await _approvalRepository.GetByRequestIdAsync(requestId, cancellationToken);
         if (existing is not null)
@@ -84,9 +100,9 @@ public sealed class StartApprovalCommandHandler
             request.Reject();
         }
 
-        // Start before dispatch so auto-approve can enqueue fulfillment against the
-        // in-scope saga (not yet SaveChanges'd — see LicenseExtensionSagaOrchestrator).
-        _ = await _sagaOrchestrator.StartForRequestAsync(
+        // Start before dispatch; pass the returned saga so dispatch does not re-query
+        // an Added-but-unsaved aggregate (repository Local is a safety net).
+        var saga = await _sagaOrchestrator.StartForRequestAsync(
             request,
             band,
             command.CorrelationId,
@@ -97,6 +113,7 @@ public sealed class StartApprovalCommandHandler
         {
             await _sagaOrchestrator.DispatchFulfillmentAsync(
                 request,
+                saga,
                 correlationId: null,
                 causationId: null,
                 cancellationToken);

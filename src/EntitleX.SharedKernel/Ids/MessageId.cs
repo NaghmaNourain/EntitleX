@@ -1,4 +1,4 @@
-namespace EntitleX.BuildingBlocks.Ids;
+namespace EntitleX.SharedKernel.Ids;
 
 /// <summary>Unique identity for a single integration message (envelope MessageId).</summary>
 public readonly record struct MessageId(Guid Value)
