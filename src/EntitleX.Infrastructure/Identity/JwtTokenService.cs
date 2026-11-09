@@ -73,7 +73,7 @@ public sealed class JwtTokenService : IJwtTokenService
             }
         }
 
-        // IdentityModel 8+ matches HMAC keys by kid; keep a stable KeyId on sign and validate.
+        // IdentityModel 8+ matches HMAC keys by kid; set KeyId and emit kid on the JWT header.
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey))
         {
             KeyId = JwtHmacKey.KeyId
@@ -89,6 +89,7 @@ public sealed class JwtTokenService : IJwtTokenService
             notBefore: DateTime.UtcNow.AddMinutes(-1),
             expires: expires,
             signingCredentials: credentials);
+        token.Header[JwtHeaderParameterNames.Kid] = JwtHmacKey.KeyId;
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
