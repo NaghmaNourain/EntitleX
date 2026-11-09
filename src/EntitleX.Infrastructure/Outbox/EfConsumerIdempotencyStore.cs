@@ -20,11 +20,31 @@ public sealed class EfConsumerIdempotencyStore : IConsumerIdempotencyStore
         string? messageType = null,
         CancellationToken cancellationToken = default)
     {
-        _db.ProcessedMessages.Add(new ProcessedMessage(
+        // Same scoped DbContext may already track a successful prior claim;
+        // Add() would throw an identity conflict before the unique-index catch.
+        if (_db.ProcessedMessages.Local.Any(x =>
+                x.ConsumerName == consumerName && x.IdempotencyKey == idempotencyKey))
+        {
+            return false;
+        }
+
+        var exists = await _db.ProcessedMessages
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.ConsumerName == consumerName && x.IdempotencyKey == idempotencyKey,
+                cancellationToken);
+        if (exists)
+        {
+            return false;
+        }
+
+        var entity = new ProcessedMessage(
             consumerName,
             idempotencyKey,
             DateTimeOffset.UtcNow,
-            messageType));
+            messageType);
+
+        _db.ProcessedMessages.Add(entity);
 
         try
         {
@@ -33,7 +53,12 @@ public sealed class EfConsumerIdempotencyStore : IConsumerIdempotencyStore
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
-            _db.ChangeTracker.Clear();
+            var entry = _db.Entry(entity);
+            if (entry.State != EntityState.Detached)
+            {
+                entry.State = EntityState.Detached;
+            }
+
             return false;
         }
     }

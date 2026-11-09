@@ -46,9 +46,13 @@ public sealed class EfRetryClaimStore : IRetryClaimStore
 
         var distinct = logicalOperationIds.Distinct().ToList();
 
-        var idempotencyTaken = await _db.ApiIdempotencyRecords
-            .AsNoTracking()
-            .AnyAsync(x => x.IdempotencyKey == idempotencyKey, cancellationToken);
+        // Include Local: prior TryClaim in the same scoped DbContext may have
+        // staged rows that AsNoTracking queries will not see until SaveChanges.
+        var idempotencyTaken =
+            _db.ApiIdempotencyRecords.Local.Any(x => x.IdempotencyKey == idempotencyKey)
+            || await _db.ApiIdempotencyRecords
+                .AsNoTracking()
+                .AnyAsync(x => x.IdempotencyKey == idempotencyKey, cancellationToken);
         if (idempotencyTaken)
         {
             return false;
@@ -60,7 +64,14 @@ public sealed class EfRetryClaimStore : IRetryClaimStore
             .Select(x => x.LogicalOperationId)
             .ToListAsync(cancellationToken);
 
-        if (distinct.Any(id => existingClaims.Contains(id)))
+        var claimedIds = existingClaims
+            .Concat(
+                _db.RetryItemClaims.Local
+                    .Where(x => x.SourceRequestId == sourceRequestId)
+                    .Select(x => x.LogicalOperationId))
+            .ToHashSet();
+
+        if (distinct.Any(claimedIds.Contains))
         {
             return false;
         }
