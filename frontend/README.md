@@ -17,11 +17,13 @@ Shared run configs live in [`.run/`](../.run/) (checked into git; `.idea/` stays
 
 | Configuration | What it starts |
 |---------------|----------------|
+| **`Lab Full Stack`** (default) | Compose infra + CloudShield + NetworkGuard + API + Vite + OutboxPublisher + FulfillmentWorker + ResultsWorker + ReconciliationWorker + NotificationService |
+| `Lab Infra (Compose)` | `scripts/lab-infra-up.sh` → `docker compose up -d` (Postgres/Kafka/Keycloak/…) |
 | `frontend` | `npm run dev` (Vite `:5173`) |
 | `EntitleX.Api` | API launch profile `http` (`:5080`) |
-| **`API + Frontend`** (default) | Both together |
+| `API + Frontend` | API + Vite only (simulators/workers not included) |
 
-In Rider: open the solution → run-configuration dropdown → pick **API + Frontend** (or **frontend** alone). The SPA is not a .NET startup project; use these npm / compound configs instead of “Set as Startup Project” on a csproj.
+In Rider: open the solution → run-configuration dropdown → pick **Lab Full Stack**. Free host ports **5432** and **8080** first if another Compose project (`untitled-*`) owns them. One-shot lambdas are not in the compound — run them separately when needed.
 
 ## Auth
 
