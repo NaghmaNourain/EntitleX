@@ -19,6 +19,9 @@ public sealed class SqsReceivedMessage
     public required string QueueUrl { get; init; }
 
     public int ApproximateReceiveCount { get; init; }
+
+    /// <summary>W3C parent context extracted from SQS message attributes (if present).</summary>
+    public ActivityContext TraceContext { get; init; }
 }
 
 /// <summary>Long-polls the fulfillment SQS queue with visibility-timeout handling.</summary>
@@ -42,9 +45,9 @@ public sealed class SqsFulfillmentConsumer
         CancellationToken cancellationToken = default)
     {
         var destination = _options.FulfillmentQueueName;
-        using var activity = MessagingTelemetry.StartConsume("sqs", destination);
         var sw = Stopwatch.StartNew();
         var success = false;
+        Activity? activity = null;
 
         try
         {
@@ -68,6 +71,19 @@ public sealed class SqsFulfillmentConsumer
                 return [];
             }
 
+            var parent = default(ActivityContext);
+            foreach (var candidate in response.Messages)
+            {
+                if (TraceContextPropagator.TryParseFromSqsMessageAttributes(
+                        candidate.MessageAttributes,
+                        out parent))
+                {
+                    break;
+                }
+            }
+
+            activity = MessagingTelemetry.StartConsume("sqs", destination, parent);
+
             var results = new List<SqsReceivedMessage>(response.Messages.Count);
             foreach (var message in response.Messages)
             {
@@ -85,12 +101,17 @@ public sealed class SqsFulfillmentConsumer
                         receiveCount = parsed;
                     }
 
+                    TraceContextPropagator.TryParseFromSqsMessageAttributes(
+                        message.MessageAttributes,
+                        out var messageParent);
+
                     results.Add(new SqsReceivedMessage
                     {
                         Envelope = envelope,
                         ReceiptHandle = message.ReceiptHandle,
                         QueueUrl = queueUrl,
-                        ApproximateReceiveCount = receiveCount
+                        ApproximateReceiveCount = receiveCount,
+                        TraceContext = messageParent
                     });
                 }
                 catch (Exception ex)
@@ -110,6 +131,7 @@ public sealed class SqsFulfillmentConsumer
         finally
         {
             MessagingTelemetry.RecordOperation("sqs", "receive", destination, sw.Elapsed.TotalSeconds, success);
+            activity?.Dispose();
         }
     }
 

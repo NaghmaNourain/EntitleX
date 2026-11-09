@@ -23,15 +23,11 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
-    builder.Host.UseSerilog((context, services, configuration) => configuration
-        .ReadFrom.Configuration(context.Configuration)
-        .ReadFrom.Services(services)
-        .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-        .Enrich.FromLogContext()
-        .Enrich.WithProperty("Service", "EntitleX.Api")
-        .Enrich.WithEnvironmentName()
-        .Enrich.WithMachineName()
-        .WriteTo.Console());
+    builder.Host.UseSerilog((context, services, configuration) =>
+        SerilogHostingExtensions.ApplySharedEnrichers(configuration, context.Configuration, "EntitleX.Api")
+            .ReadFrom.Services(services)
+            .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+            .WriteTo.Console());
 
     builder.Services.AddEntitleXOpenTelemetry(builder.Configuration, "EntitleX.Api", isAspNetCoreHost: true);
     builder.Services.AddApplication();

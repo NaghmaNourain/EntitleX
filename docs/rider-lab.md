@@ -20,6 +20,7 @@ Shared configs live in both [`.run/`](../.run/) and [`.idea/runConfigurations/`]
    This is a **Shell** config (same type as Lab Infra) that runs `scripts/lab-full-stack.sh`.  
    Also listed under **Run → Edit Configurations…**.
 5. Open http://localhost:5173 (API `:5080`, CloudShield `127.0.0.1:5081`, NetworkGuard `127.0.0.1:5082`).
+6. Observability UIs (Compose): Grafana http://localhost:3001 (admin/admin), Jaeger http://localhost:16686, Prometheus targets http://localhost:9090/targets — see [observability.md](observability.md).
 
 ## What Lab Full Stack starts
 

@@ -18,25 +18,32 @@ public static class SerilogHostingExtensions
         IConfiguration configuration,
         string serviceName)
     {
-        services.AddSerilog((_, loggerConfiguration) => loggerConfiguration
-            .ReadFrom.Configuration(configuration)
-            .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-            .Enrich.FromLogContext()
-            .Enrich.WithProperty("Service", serviceName)
-            .Enrich.WithEnvironmentName()
-            .Enrich.WithMachineName()
-            .WriteTo.Console());
+        services.AddSerilog((_, loggerConfiguration) =>
+            ApplySharedEnrichers(loggerConfiguration, configuration, serviceName)
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+                .WriteTo.Console());
 
         return services;
     }
 
     public static IHostBuilder UseEntitleXSerilog(this IHostBuilder host, string serviceName) =>
-        host.UseSerilog((context, services, configuration) => configuration
-            .ReadFrom.Configuration(context.Configuration)
-            .ReadFrom.Services(services)
+        host.UseSerilog((context, services, configuration) =>
+            ApplySharedEnrichers(configuration, context.Configuration, serviceName)
+                .ReadFrom.Services(services)
+                .WriteTo.Console());
+
+    /// <summary>
+    /// Shared enrichers for host-local <c>UseSerilog</c> lambdas (Api / simulators).
+    /// </summary>
+    public static LoggerConfiguration ApplySharedEnrichers(
+        LoggerConfiguration loggerConfiguration,
+        IConfiguration configuration,
+        string serviceName) =>
+        loggerConfiguration
+            .ReadFrom.Configuration(configuration)
             .Enrich.FromLogContext()
             .Enrich.WithProperty("Service", serviceName)
             .Enrich.WithEnvironmentName()
             .Enrich.WithMachineName()
-            .WriteTo.Console());
+            .Enrich.With(new ActivityTraceEnricher());
 }
