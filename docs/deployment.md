@@ -79,7 +79,9 @@ Triggers: `push`, `pull_request` (concurrency cancel-in-progress).
 | `build-test` | Restore, Release build, unit + integration + E2E scaffolding tests |
 | `static-analysis` | Soft `dotnet format` gate, analyzer build, `terraform fmt -check` |
 | `frontend` | Node 22, `npm ci`, `npm run build` |
-| `docker-images` | Build API / sample worker / CloudShield / frontend images (`push: false`) |
+| `docker-images` | Build API / sample worker / CloudShield / frontend images (`push: false`); Trivy CRITICAL/HIGH gate on API image |
+
+Also: `.github/workflows/codeql.yml` (C# + JS/TS on `main` / PRs + weekly) and `.github/dependabot.yml` (NuGet, npm, Actions, Docker — weekly).
 
 Integration tests use `DockerFact` — skip cleanly when Docker is unavailable.
 
