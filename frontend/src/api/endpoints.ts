@@ -11,6 +11,7 @@ import type {
   PendingApprovalsPage,
   ReconciliationRunResult,
   RequestAuditPage,
+  RequestInsight,
   SagaDto,
 } from './types'
 
@@ -118,6 +119,20 @@ export const api = {
     return apiRequest<ReconciliationRunResult>(
       `/api/v1/admin/reconciliation/requests/${requestId}`,
       { method: 'POST' },
+    )
+  },
+
+  explainRequest(requestId: string, signal?: AbortSignal) {
+    return apiRequest<RequestInsight>(
+      `/api/v1/license-extension-requests/${requestId}/explain`,
+      { signal },
+    )
+  },
+
+  reconcileRca(requestId: string, signal?: AbortSignal) {
+    return apiRequest<RequestInsight>(
+      `/api/v1/admin/reconciliation/requests/${requestId}/rca`,
+      { signal },
     )
   },
 

@@ -15,6 +15,7 @@ import { ErrorAlert } from '../components/ErrorAlert'
 import { LoadingState } from '../components/LoadingState'
 import { PageHeader } from '../components/PageHeader'
 import { RequestIdField } from '../components/RequestIdField'
+import { RequestInsightPanel } from '../components/RequestInsightPanel'
 import { StatusChip } from '../components/StatusChip'
 
 export function RequestDetailsPage() {
@@ -85,6 +86,12 @@ export function RequestDetailsPage() {
 
       {requestQuery.data && (
         <Stack spacing={2}>
+          <RequestInsightPanel
+            requestId={requestId}
+            mode="explain"
+            title="Explain this request"
+            buttonLabel="Explain"
+          />
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
               <StatusChip status={requestQuery.data.status} />

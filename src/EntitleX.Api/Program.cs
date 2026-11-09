@@ -149,6 +149,7 @@ try
     app.MapPendingApprovalEndpoints();
     app.MapSagaEndpoints();
     app.MapReconciliationEndpoints();
+    app.MapInsightsEndpoints();
     app.MapAuditEndpoints();
     app.MapOpsEndpoints();
 

@@ -14,6 +14,7 @@ import { ErrorAlert } from '../components/ErrorAlert'
 import { LoadingState } from '../components/LoadingState'
 import { PageHeader } from '../components/PageHeader'
 import { RequestIdField } from '../components/RequestIdField'
+import { RequestInsightPanel } from '../components/RequestInsightPanel'
 import { StatusChip } from '../components/StatusChip'
 
 export function FulfillmentProgressPage() {
@@ -50,6 +51,12 @@ export function FulfillmentProgressPage() {
 
       {query.data && (
         <Stack spacing={2}>
+          <RequestInsightPanel
+            requestId={requestId}
+            mode="explain"
+            title="Explain fulfillment status"
+            buttonLabel="Explain"
+          />
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center" sx={{ mb: 2 }}>
               <StatusChip status={query.data.state} />

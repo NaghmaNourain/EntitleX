@@ -16,6 +16,7 @@ Enterprise license-extension platform (portfolio). Orchestrates extension reques
 - **Workers**: OutboxPublisher, FulfillmentWorker, ReconciliationWorker, NotificationService
 - **Lambdas** (local hosts + EventBridge): ApprovalReminder, ExpirationNotification
 - **Observability**: OTel → Jaeger, Prometheus/Grafana, Serilog — [docs/observability.md](docs/observability.md)
+- **Insights (optional)**: grounded Explain / reconciliation RCA (`AiAssist:Enabled=false` by default; optional local Ollama only — no AWS AI spend) — [docs/reconciliation.md](docs/reconciliation.md)
 - **Frontend**: Vite React control-plane UI — [frontend/README.md](frontend/README.md)
 - **Optional AWS**: Terraform under `infra/terraform/` — [docs/deployment.md](docs/deployment.md)
 - ADR: [docs/adr/0001-modular-api-vs-microservices.md](docs/adr/0001-modular-api-vs-microservices.md)
@@ -81,6 +82,21 @@ terraform init && terraform plan
 ```
 
 Secrets (JWT, connection strings) go into Secrets Manager **outside** Terraform — never commit them. Details: [docs/deployment.md](docs/deployment.md).
+
+### Optional: local Ollama for insight narration
+
+Explain / RCA always return a deterministic grounded summary. To optionally rephrase with a local model (no cloud cost):
+
+```bash
+# Install/run Ollama, then: ollama pull llama3.2
+# In EntitleX.Api config or env:
+# AiAssist__Enabled=true
+# AiAssist__BaseUrl=http://127.0.0.1:11434/v1
+# AiAssist__Model=llama3.2
+# ENTITLEX_AI_API_KEY=ollama   # optional; Ollama ignores auth
+```
+
+Leave `AiAssist:Enabled=false` (default) on AWS lab / CI.
 
 ### Auth
 
