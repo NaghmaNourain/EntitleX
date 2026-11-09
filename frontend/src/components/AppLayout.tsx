@@ -95,8 +95,10 @@ export function AppLayout() {
         <IconButton
           aria-label="Sign out"
           onClick={() => {
-            logout()
-            navigate('/login')
+            void (async () => {
+              await logout()
+              navigate('/login')
+            })()
           }}
           size="small"
         >

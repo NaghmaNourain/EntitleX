@@ -47,6 +47,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+!.env.development
 *.pfx
 *.key
 appsettings.*.local.json

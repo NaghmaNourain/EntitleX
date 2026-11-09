@@ -18,7 +18,9 @@ Simulators (**CloudShield**, **NetworkGuard**) have **no JWT**.
 
 ## EntitleX.Api (`:5080`)
 
-Host: `src/EntitleX.Api` — JWT Bearer; Swagger in Development.
+Host: `src/EntitleX.Api` — JWT Bearer (OIDC Authority and/or Dev HMAC); Swagger in Development.
+
+OIDC (generic): `Oidc:Enabled`, `Oidc:Authority`, `Oidc:Audience`, `Oidc:RoleClaimType`, optional `Oidc:RoleMap`. Production requires Authority; DevToken is forced off. Policies above are unchanged.
 
 ### Health / ops infra
 
@@ -33,9 +35,9 @@ Host: `src/EntitleX.Api` — JWT Bearer; Swagger in Development.
 
 | Method | Path | Auth | Handler |
 |--------|------|------|---------|
-| `POST` | `/api/v1/dev/tokens` | Anonymous; Dev only when `Jwt:EnableDevTokenEndpoint` | `DevTokenEndpoints.MintAsync` |
+| `POST` | `/api/v1/dev/tokens` | Anonymous; **Development only** when `Jwt:EnableDevTokenEndpoint` (disabled in Production) | `DevTokenEndpoints.MintAsync` |
 
-Body: `{ "role": "RenewalRepresentative" | "RenewalManager" | "DealDeskManager" | "PlatformAdmin" }`.
+Body: `{ "role": "RenewalRepresentative" | "RenewalManager" | "DealDeskManager" | "PlatformAdmin" }`. Prefer Keycloak OIDC locally when Compose Keycloak is up.
 
 ### License extension requests
 

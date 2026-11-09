@@ -15,6 +15,7 @@ import { EntitlementSearchPage } from './pages/EntitlementSearchPage'
 import { FailedEntitlementDetailsPage } from './pages/FailedEntitlementDetailsPage'
 import { FulfillmentProgressPage } from './pages/FulfillmentProgressPage'
 import { LoginPage } from './pages/LoginPage'
+import { OidcCallbackPage } from './pages/OidcCallbackPage'
 import { OpsMonitoringPage } from './pages/OpsMonitoringPage'
 import { RequestDetailsPage } from './pages/RequestDetailsPage'
 import { RequestLineagePage } from './pages/RequestLineagePage'
@@ -40,6 +41,7 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/login/callback" element={<OidcCallbackPage />} />
               <Route
                 element={
                   <RequireAuth>
