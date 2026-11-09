@@ -24,13 +24,20 @@ public sealed class EfLocalFulfillmentOutcomeStore : ILocalFulfillmentOutcomeSto
         LogicalOperationId logicalOperationId,
         CancellationToken cancellationToken = default)
     {
-        var row = await _db.FulfillmentItemResults
+        var rows = await _db.FulfillmentItemResults
             .AsNoTracking()
-            .SingleOrDefaultAsync(
-                r => r.LogicalOperationId == logicalOperationId.Value,
-                cancellationToken);
+            .Where(r => r.LogicalOperationId == logicalOperationId.Value)
+            .ToListAsync(cancellationToken);
 
-        return row is null ? null : ToModel(row);
+        if (rows.Count == 0)
+        {
+            return null;
+        }
+
+        var preferred = rows.FirstOrDefault(r => r.Succeeded)
+            ?? rows.OrderByDescending(r => r.RecordedAtUtc).First();
+
+        return ToModel(preferred);
     }
 
     public async Task<IReadOnlyList<LocalFulfillmentOutcome>> ListByRequestAsync(
@@ -53,6 +60,7 @@ public sealed class EfLocalFulfillmentOutcomeStore : ILocalFulfillmentOutcomeSto
             outcome.RequestId,
             outcome.RequestItemId,
             outcome.LogicalOperationId,
+            outcome.AttemptId,
             outcome.EntitlementId,
             outcome.Provider,
             outcome.Succeeded,
@@ -72,8 +80,9 @@ public sealed class EfLocalFulfillmentOutcomeStore : ILocalFulfillmentOutcomeSto
         {
             _db.ChangeTracker.Clear();
             _logger.LogDebug(
-                "Fulfillment outcome already recorded for logicalOp={LogicalOperationId}",
-                outcome.LogicalOperationId);
+                "Fulfillment outcome already recorded for logicalOp={LogicalOperationId} attempt={AttemptId}",
+                outcome.LogicalOperationId,
+                outcome.AttemptId);
             return false;
         }
     }
@@ -83,6 +92,7 @@ public sealed class EfLocalFulfillmentOutcomeStore : ILocalFulfillmentOutcomeSto
             row.RequestId,
             row.RequestItemId,
             row.LogicalOperationId,
+            row.AttemptId,
             row.EntitlementId,
             row.Provider,
             row.Succeeded,

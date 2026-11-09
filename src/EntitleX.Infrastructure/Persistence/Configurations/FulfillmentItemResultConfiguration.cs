@@ -15,6 +15,7 @@ public sealed class FulfillmentItemResultConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.RequestId).HasColumnName("request_id");
         builder.Property(x => x.RequestItemId).HasColumnName("request_item_id");
         builder.Property(x => x.LogicalOperationId).HasColumnName("logical_operation_id");
+        builder.Property(x => x.AttemptId).HasColumnName("attempt_id");
         builder.Property(x => x.EntitlementId).HasColumnName("entitlement_id").HasMaxLength(256);
         builder.Property(x => x.Provider).HasColumnName("provider").HasMaxLength(64);
         builder.Property(x => x.Succeeded).HasColumnName("succeeded");
@@ -22,7 +23,11 @@ public sealed class FulfillmentItemResultConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.ErrorMessage).HasColumnName("error_message").HasMaxLength(2000);
         builder.Property(x => x.RecordedAtUtc).HasColumnName("recorded_at_utc");
 
-        builder.HasIndex(x => x.LogicalOperationId).IsUnique();
+        builder.HasIndex(x => new { x.LogicalOperationId, x.AttemptId })
+            .IsUnique()
+            .HasDatabaseName("ux_fulfillment_item_results_logical_attempt");
+        builder.HasIndex(x => x.LogicalOperationId)
+            .HasDatabaseName("ix_fulfillment_item_results_logical_operation_id");
         builder.HasIndex(x => x.RequestId);
     }
 }

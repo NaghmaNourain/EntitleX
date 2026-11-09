@@ -34,6 +34,7 @@ public sealed class ReconciliationGateTests
                 request.Id.Value,
                 failed.Id.Value,
                 failed.LogicalOperationId.Value,
+                failed.AttemptId.Value,
                 failed.EntitlementId.Value,
                 "CloudShield",
                 Succeeded: true,

@@ -33,9 +33,13 @@ public sealed class SagaItemOutcomeConfiguration : IEntityTypeConfiguration<Saga
             .HasColumnName("logical_operation_id")
             .IsRequired();
 
-        builder.HasIndex(x => x.LogicalOperationId)
+        // Scoped per saga so selective retries (same LogicalOperationId, new saga) can seed outcomes.
+        builder.HasIndex("SagaId", nameof(SagaItemOutcome.LogicalOperationId))
             .IsUnique()
-            .HasDatabaseName("ux_saga_item_outcomes_logical_operation_id");
+            .HasDatabaseName("ux_saga_item_outcomes_saga_logical_operation_id");
+
+        builder.HasIndex(x => x.LogicalOperationId)
+            .HasDatabaseName("ix_saga_item_outcomes_logical_operation_id");
 
         builder.Property(x => x.Status)
             .HasColumnName("status")

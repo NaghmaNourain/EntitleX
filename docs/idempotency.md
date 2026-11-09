@@ -64,7 +64,15 @@ flowchart TB
 
 Succeeded siblings are **never** copied (forward recovery).
 
-`LogicalOperationId` type: `EntitleX.BuildingBlocks.Ids.LogicalOperationId` (readonly record struct over `Guid`). Unique indexes: saga outcomes, fulfillment results, provider `applied_license_operations`.
+`LogicalOperationId` type: `EntitleX.BuildingBlocks.Ids.LogicalOperationId` (readonly record struct over `Guid`). Unique indexes:
+
+| Table | Uniqueness |
+|---|---|
+| `saga_item_outcomes` | `(saga_id, logical_operation_id)` — scoped per saga so child retries can seed the same LogicalOp |
+| `fulfillment_item_results` | `(logical_operation_id, attempt_id)` — one ledger row per attempt |
+| Provider `applied_license_operations` | `logical_operation_id` (provider apply idempotency) |
+
+Provider-result consumer claim key: `result:{LogicalOperationId}:{AttemptId}` in `processed_messages`.
 
 ## Reconcile-uncertain gate (Phase 8)
 
@@ -85,7 +93,7 @@ case, saga seed, and fulfillment **outbox** row:
 | Table | Role |
 |---|---|
 | `api_idempotency_records` | Unique `idempotency_key` → `retry_request_id` (lost-response) |
-| `retry_item_claims` | Unique `(source_request_id, logical_operation_id)` — blocks concurrent overlapping retries of the same source items |
+| `retry_item_claims` | Unique `(source_request_id, logical_operation_id)` — blocks concurrent overlapping retries of the same source items. Claims whose child retry is terminal `Failed`/`Rejected` are released so a later retry can proceed. |
 
 **Transaction boundary:** Postgres only. The API never holds a DB transaction
 open across Kafka, SQS, or outbound HTTP. Async fulfillment is dispatched by

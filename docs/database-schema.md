@@ -188,7 +188,7 @@ erDiagram
 | `license_extension_sagas` / `transitions` / `item_outcomes` | Durable saga ledger |
 | `outbox_messages` | Transactional outbox (`Pending`/`Processing`/`Published`/`Poison`) |
 | `processed_messages` | Consumer idempotency composite PK |
-| `fulfillment_item_results` | Local fulfillment ledger (unique `logical_operation_id`) |
+| `fulfillment_item_results` | Local fulfillment ledger (unique `(logical_operation_id, attempt_id)`) |
 | `api_idempotency_records` / `retry_item_claims` | Selective-retry HTTP + concurrency |
 | `audit_events` | Append-only audit (recon + ops) |
 | `approval_reminder_records` / `expiration_notification_records` | Lambda idempotency windows |

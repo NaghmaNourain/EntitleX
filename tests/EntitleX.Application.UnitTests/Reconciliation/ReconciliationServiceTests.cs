@@ -113,10 +113,12 @@ public sealed class ReconciliationServiceTests
             ProviderOperationLookupKind.ConfirmedApplied);
 
         var local = new InMemoryLocalOutcomes();
+        var failedItem = request.Items.Single(i => i.LogicalOperationId.Equals(failedOp));
         local.ByLogical[failedOp.Value] = new LocalFulfillmentOutcome(
             request.Id.Value,
-            request.Items.Single(i => i.LogicalOperationId.Equals(failedOp)).Id.Value,
+            failedItem.Id.Value,
             failedOp.Value,
+            failedItem.AttemptId.Value,
             "ent-fail",
             "CloudShield",
             Succeeded: true,
