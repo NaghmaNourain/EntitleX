@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Start Docker Compose lab dependencies (Postgres, Kafka, Keycloak, LocalStack, Mailpit, OTel stack).
 # Idempotent: safe to re-run. Does not start API / SPA / simulators / workers.
+# Intentionally committed as the canonical lab bootstrap (no local-only drift).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

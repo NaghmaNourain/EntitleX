@@ -36,9 +36,8 @@ coverage/
 .vs/
 .vscode/
 !.vscode/extensions.json
-.idea/*
-!.idea/runConfigurations/
-!.idea/runConfigurations/**
+.idea/
+.run/
 *.swp
 *.swo
 *~

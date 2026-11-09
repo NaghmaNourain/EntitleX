@@ -42,19 +42,49 @@ jobs:
       - name: Restore
         run: dotnet restore EntitleX.sln
 
+      - name: Vulnerable package audit (High+)
+        # Soft gate: report High/Critical findings without failing the job so CI stays green
+        # while transitive upgrades are staged. Flip to hard-fail once the inventory is clean.
+        run: |
+          set -euo pipefail
+          dotnet list EntitleX.sln package --vulnerable --include-transitive --format json > /tmp/vuln.json || true
+          if command -v jq >/dev/null 2>&1; then
+            high=$(jq -r '
+              .. | objects
+              | select(has("severity") or has("Severity"))
+              | (.severity // .Severity // "")
+              | ascii_upcase
+              | select(. == "HIGH" or . == "CRITICAL")
+            ' /tmp/vuln.json | wc -l)
+            if [ "$high" -gt 0 ]; then
+              echo "::warning::Found High/Critical vulnerable NuGet packages (soft gate; see /tmp/vuln.json)"
+              cat /tmp/vuln.json
+              exit 0
+            fi
+          else
+            if grep -Eiq '"severity"\s*:\s*"(High|Critical)"' /tmp/vuln.json; then
+              echo "::warning::Found High/Critical vulnerable NuGet packages (soft gate)"
+              cat /tmp/vuln.json
+              exit 0
+            fi
+          fi
+          echo "No High/Critical vulnerable packages reported."
+
       - name: Build
         run: dotnet build EntitleX.sln --configuration Release --no-restore
 
-      - name: Unit tests
+      - name: Unit tests + coverage
         run: |
           set -euo pipefail
+          mkdir -p TestResults/coverage
           run_tests() {
             local project="$1"
             local title="$2"
+            local extra=("${@:3}")
             local log
             log="$(mktemp)"
             set +e
-            dotnet test "$project" --configuration Release --no-build --verbosity normal | tee "$log"
+            dotnet test "$project" --configuration Release --no-build --verbosity normal "${extra[@]}" | tee "$log"
             local ec=${PIPESTATUS[0]}
             set -e
             if [ "$ec" -ne 0 ]; then
@@ -67,15 +97,62 @@ jobs:
               exit "$ec"
             fi
           }
-          run_tests tests/EntitleX.Domain.UnitTests/EntitleX.Domain.UnitTests.csproj "Unit test failure"
-          run_tests tests/EntitleX.Application.UnitTests/EntitleX.Application.UnitTests.csproj "Unit test failure"
+          run_tests tests/EntitleX.Domain.UnitTests/EntitleX.Domain.UnitTests.csproj "Unit test failure" \
+            --collect:"XPlat Code Coverage" --results-directory TestResults/coverage
+          run_tests tests/EntitleX.Application.UnitTests/EntitleX.Application.UnitTests.csproj "Unit test failure" \
+            --collect:"XPlat Code Coverage" --results-directory TestResults/coverage
           run_tests tests/EntitleX.Infrastructure.UnitTests/EntitleX.Infrastructure.UnitTests.csproj "Unit test failure"
           run_tests tests/CloudShield.Domain.UnitTests/CloudShield.Domain.UnitTests.csproj "Unit test failure"
+
+      - name: Soft coverage floor (Domain / Application)
+        # Soft gate: annotate when coverage is below the floor; do not fail the job yet.
+        run: |
+          set -euo pipefail
+          FLOOR=40
+          mapfile -t files < <(find TestResults/coverage -name coverage.cobertura.xml 2>/dev/null || true)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::warning::No cobertura coverage files found (soft floor skipped)."
+            exit 0
+          fi
+          python3 - <<'PY' "$FLOOR" "${files[@]}"
+          import sys, xml.etree.ElementTree as ET
+          floor = float(sys.argv[1])
+          paths = sys.argv[2:]
+          line_ok = line_total = 0
+          for path in paths:
+              root = ET.parse(path).getroot()
+              # cobertura root may be coverage with line-rate attr
+              rate = root.attrib.get("line-rate")
+              if rate is not None:
+                  covered = float(rate) * 100
+                  print(f"{path}: line-rate={covered:.1f}%")
+                  if covered < floor:
+                      print(f"::warning::Coverage {covered:.1f}% is below soft floor {floor:.0f}% ({path})")
+                  continue
+              for cls in root.iter("class"):
+                  lines = list(cls.find("lines") or [])
+                  for line in lines:
+                      line_total += 1
+                      if int(line.attrib.get("hits", "0")) > 0:
+                          line_ok += 1
+          if line_total:
+              pct = 100.0 * line_ok / line_total
+              print(f"Aggregated line coverage≈{pct:.1f}% ({line_ok}/{line_total})")
+              if pct < floor:
+                  print(f"::warning::Aggregated coverage {pct:.1f}% is below soft floor {floor:.0f}%")
+          PY
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-cobertura
+          path: TestResults/coverage
+          if-no-files-found: ignore
 
       - name: Integration tests
         # Uses GHA postgres service via ENTITLEX_TEST_POSTGRES / CLOUDSHIELD_TEST_POSTGRES.
         # DockerFact skips cleanly when those env vars are absent (no Testcontainers under CI).
-        # On failure, emit compact annotations including failing test names.
         run: |
           set -euo pipefail
           run_tests() {
@@ -121,9 +198,11 @@ jobs:
         run: dotnet restore EntitleX.sln
 
       - name: Format verify
-        # Soft gate: warn on format drift without failing the whole pack if no .editorconfig rules yet.
+        # Soft gate until format drift across the stack is fully normalized.
         run: |
-          dotnet format EntitleX.sln --verify-no-changes --severity warn || echo "::warning::dotnet format reported differences (non-blocking soft gate)"
+          if ! dotnet format EntitleX.sln --verify-no-changes --severity warn; then
+            echo "::warning::dotnet format reported differences (non-blocking soft gate)"
+          fi
 
       - name: Build with analyzers
         run: dotnet build EntitleX.sln --configuration Release -p:EnforceCodeStyleInBuild=true
@@ -139,6 +218,21 @@ jobs:
             echo "::error::terraform fmt -check failed; run 'terraform fmt -recursive' under infra/terraform"
             exit 1
           fi
+
+  gitleaks:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Community edition: no license required for public repos; keep verbose for CI.
+          GITLEAKS_ENABLE_COMMENTS: "false"
 
   frontend:
     name: Frontend build
@@ -159,6 +253,9 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      - name: Lint
+        run: npm run lint
 
       - name: Build
         run: npm run build
@@ -200,10 +297,20 @@ jobs:
           context: .
           file: infra/docker/images/Dockerfile.worker
           push: false
+          load: true
           tags: entitlex-outbox-publisher:ci
           build-args: |
             PROJECT_PATH=src/workers/EntitleX.OutboxPublisher/EntitleX.OutboxPublisher.csproj
             DLL_NAME=EntitleX.OutboxPublisher.dll
+
+      - name: Scan worker image (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: entitlex-outbox-publisher:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
 
       - name: Build CloudShield image
         uses: docker/build-push-action@v6
@@ -211,10 +318,20 @@ jobs:
           context: .
           file: infra/docker/images/Dockerfile.simulator
           push: false
+          load: true
           tags: entitlex-cloudshield:ci
           build-args: |
             PROJECT_PATH=src/simulators/CloudShield/CloudShield.Api/CloudShield.Api.csproj
             DLL_NAME=CloudShield.Api.dll
+
+      - name: Scan simulator image (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: entitlex-cloudshield:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
 
       - name: Build frontend image
         uses: docker/build-push-action@v6
@@ -222,4 +339,14 @@ jobs:
           context: .
           file: infra/docker/images/Dockerfile.frontend
           push: false
+          load: true
           tags: entitlex-frontend:ci
+
+      - name: Scan frontend image (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: entitlex-frontend:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true

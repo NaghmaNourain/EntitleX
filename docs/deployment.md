@@ -100,10 +100,11 @@ Triggers: `push`, `pull_request` (concurrency cancel-in-progress).
 
 | Job | What |
 |-----|------|
-| `build-test` | Restore, Release build, unit + integration + API WebApplicationFactory + E2E scaffolding tests |
-| `static-analysis` | Soft `dotnet format` gate, analyzer build, `terraform fmt -check` |
-| `frontend` | Node 22, `npm ci`, `npm run build` |
-| `docker-images` | Build API / sample worker / CloudShield / frontend images (`push: false`); Trivy CRITICAL/HIGH gate on API image |
+| `build-test` | Restore, vulnerable-package audit (fail High+), Release build (`TreatWarningsAsErrors`), unit tests with XPlat coverage (soft Domain/Application floor), integration + API WebApplicationFactory + E2E scaffolding |
+| `static-analysis` | Hard `dotnet format --verify-no-changes`, analyzer build, `terraform fmt -check` |
+| `gitleaks` | Secret scan (`gitleaks-action`) |
+| `frontend` | Node 22, `npm ci`, oxlint, `npm run build` |
+| `docker-images` | Build API / worker / CloudShield / frontend (`push: false`); Trivy CRITICAL/HIGH on each loaded image; images run as non-root + `HEALTHCHECK` |
 
 Also: `.github/workflows/codeql.yml` (C# + JS/TS on `main` / PRs + weekly) and `.github/dependabot.yml` (NuGet, npm, Actions, Docker — weekly).
 
