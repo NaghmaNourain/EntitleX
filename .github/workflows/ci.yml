@@ -36,10 +36,30 @@ jobs:
 
       - name: Integration tests
         # Testcontainers tests skip gracefully via DockerFact when Docker is unavailable.
+        # On failure, emit compact annotations so root causes are visible without log downloads.
         run: |
-          dotnet test tests/EntitleX.Infrastructure.IntegrationTests/EntitleX.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
-          dotnet test tests/CloudShield.Infrastructure.IntegrationTests/CloudShield.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
-          dotnet test tests/EntitleX.Api.Tests/EntitleX.Api.Tests.csproj --configuration Release --no-build --verbosity normal
+          set -euo pipefail
+          run_tests() {
+            local project="$1"
+            local log
+            log="$(mktemp)"
+            set +e
+            dotnet test "$project" --configuration Release --no-build --verbosity normal | tee "$log"
+            local ec=${PIPESTATUS[0]}
+            set -e
+            if [ "$ec" -ne 0 ]; then
+              echo "::group::Failing test excerpts ($project)"
+              grep -E '\[FAIL\]|Failed |Error Message:|Assert\.|Exception:|System\.[A-Za-z]+Exception' "$log" | tail -n 40 \
+                | while IFS= read -r line; do
+                    echo "::error title=Integration test failure::${line}"
+                  done || true
+              echo "::endgroup::"
+              exit "$ec"
+            fi
+          }
+          run_tests tests/EntitleX.Infrastructure.IntegrationTests/EntitleX.Infrastructure.IntegrationTests.csproj
+          run_tests tests/CloudShield.Infrastructure.IntegrationTests/CloudShield.Infrastructure.IntegrationTests.csproj
+          run_tests tests/EntitleX.Api.Tests/EntitleX.Api.Tests.csproj
 
       - name: E2E scaffolding tests
         # Large 1000-item scenario skips without ENTITLEX_E2E=1 + Compose infra.
@@ -75,7 +95,11 @@ jobs:
           terraform_version: 1.5.7
       - name: terraform fmt
         working-directory: infra/terraform
-        run: terraform fmt -check -recursive
+        run: |
+          if ! terraform fmt -check -recursive -diff; then
+            echo "::error::terraform fmt -check failed; run 'terraform fmt -recursive' under infra/terraform"
+            exit 1
+          fi
 
   frontend:
     name: Frontend build

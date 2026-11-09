@@ -92,7 +92,10 @@ public sealed class RetryClaimConcurrencyTests : IAsyncLifetime
     private EntitleXDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<EntitleXDbContext>()
-            .UseNpgsql(_container!.GetConnectionString())
+            .UseNpgsql(_container!.GetConnectionString(), npgsql =>
+            {
+                npgsql.MigrationsAssembly(typeof(EntitleXDbContext).Assembly.FullName);
+            })
             .Options;
         return new EntitleXDbContext(options);
     }

@@ -76,8 +76,10 @@ public sealed class SelectiveRetryPersistenceTests : IAsyncLifetime
         db.LicenseExtensionSagas.Add(retrySaga);
         await db.SaveChangesAsync();
 
-        Assert.Equal(2, await db.Set<SagaItemOutcome>().CountAsync(o =>
-            o.LogicalOperationId.Equals(failedItem.LogicalOperationId)));
+        var failedLogicalValue = failedItem.LogicalOperationId.Value;
+        Assert.Equal(
+            2,
+            await db.SagaItemOutcomes.CountAsync(o => o.LogicalOperationId == failedItem.LogicalOperationId));
 
         var processor = new ProviderResultProcessor(
             db,
@@ -114,8 +116,10 @@ public sealed class SelectiveRetryPersistenceTests : IAsyncLifetime
             SagaItemOutcomeStatus.Succeeded,
             loaded.ItemOutcomes.Single().Status);
 
-        Assert.Equal(2, await verify.FulfillmentItemResults.CountAsync(r =>
-            r.LogicalOperationId == failedItem.LogicalOperationId.Value));
+        Assert.Equal(
+            2,
+            await verify.FulfillmentItemResults.CountAsync(r =>
+                r.LogicalOperationId == failedLogicalValue));
     }
 
     [DockerFact]

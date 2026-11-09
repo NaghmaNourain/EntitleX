@@ -46,3 +46,6 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
+          # Repo does not have GitHub code scanning / GHAS enabled; analyzing
+          # without upload keeps the workflow green while still exercising CodeQL.
+          upload: never

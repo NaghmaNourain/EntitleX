@@ -67,9 +67,10 @@ public static class RateLimitingExtensions
 
                 if (authenticated)
                 {
+                    var user = httpContext.User;
                     partitionKey = "user:" + (
-                        httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                        ?? httpContext.User.FindFirst("sub")?.Value
+                        user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                        ?? user.FindFirst("sub")?.Value
                         ?? "authenticated");
                     permitLimit = options.Enabled
                         ? Math.Max(1, options.AuthenticatedPermitLimit)
