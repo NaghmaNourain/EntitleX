@@ -5,6 +5,8 @@ using EntitleX.Application.Common.Behaviors;
 using EntitleX.Application.EntitlementAggregation;
 using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Application.Fulfillment;
+using EntitleX.Application.Insights;
+using EntitleX.Application.Insights.Abstractions;
 using EntitleX.Application.LicenseExtension.Retry;
 using EntitleX.Application.Notifications;
 using EntitleX.Application.Reconciliation;
@@ -33,6 +35,9 @@ public static class DependencyInjection
         services.AddScoped<IReconciliationGate, ReconciliationGate>();
         services.AddScoped<IReconciliationService, ReconciliationService>();
         services.Configure<ReconciliationAgingOptions>(_ => { });
+        services.AddScoped<IRequestInsightContextBuilder, RequestInsightContextBuilder>();
+        services.AddSingleton<DeterministicInsightComposer>();
+        services.AddScoped<RequestInsightNarrator>();
         services.AddSagaOrchestration();
 
         return services;

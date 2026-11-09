@@ -10,16 +10,18 @@ import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { api } from '../api/endpoints'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { LoadingState } from '../components/LoadingState'
 import { PageHeader } from '../components/PageHeader'
+import { RequestInsightPanel } from '../components/RequestInsightPanel'
 import { StatusChip } from '../components/StatusChip'
 
 export function OpsMonitoringPage() {
   const qc = useQueryClient()
+  const [rcaRequestId, setRcaRequestId] = useState<string | null>(null)
 
   const health = useQuery({
     queryKey: ['health'],
@@ -104,6 +106,18 @@ export function OpsMonitoringPage() {
       <ErrorAlert error={summary.error} />
       <ErrorAlert error={reconcile.error} title="Manual reconcile failed" />
 
+      {rcaRequestId && (
+        <Stack sx={{ mb: 2 }}>
+          <RequestInsightPanel
+            key={rcaRequestId}
+            requestId={rcaRequestId}
+            mode="rca"
+            title={`Reconciliation RCA · ${rcaRequestId.slice(0, 8)}…`}
+            buttonLabel="Run RCA"
+          />
+        </Stack>
+      )}
+
       {summary.data && (
         <Stack spacing={2}>
           <Alert severity="info">
@@ -179,14 +193,23 @@ export function OpsMonitoringPage() {
                     </TableCell>
                     <TableCell>{new Date(row.updatedAtUtc).toISOString()}</TableCell>
                     <TableCell>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        disabled={reconcile.isPending}
-                        onClick={() => reconcile.mutate(row.requestId)}
-                      >
-                        Reconcile
-                      </Button>
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          size="small"
+                          variant="text"
+                          onClick={() => setRcaRequestId(row.requestId)}
+                        >
+                          RCA
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={reconcile.isPending}
+                          onClick={() => reconcile.mutate(row.requestId)}
+                        >
+                          Reconcile
+                        </Button>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))}

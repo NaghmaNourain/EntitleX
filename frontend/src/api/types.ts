@@ -256,3 +256,36 @@ export interface HealthStatus {
   service?: string
   timestampUtc?: string
 }
+
+export interface InsightCitation {
+  kind: string
+  id: string
+  label: string
+}
+
+export interface RequestInsightFacts {
+  requestStatus: string | null
+  extensionNumber: string | null
+  requestedBy: string | null
+  approvalStatus: string | null
+  approvalBand: string | null
+  sagaState: string | null
+  succeededItemCount: number
+  failedItemCount: number
+  pendingItemCount: number
+  uncertainItemCount: number
+  poisonOutboxCount: number
+  ledgerMismatchCount: number
+  notes: string[]
+}
+
+export interface RequestInsight {
+  requestId: string
+  insightKind: string
+  summary: string
+  recommendedAction: string
+  narrationMode: 'Llm' | 'Fallback' | string
+  model: string | null
+  citations: InsightCitation[]
+  facts: RequestInsightFacts
+}
