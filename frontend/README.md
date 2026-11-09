@@ -17,7 +17,7 @@ Shared run configs live in [`.run/`](../.run/) (checked into git; `.idea/` stays
 
 | Configuration | What it starts |
 |---------------|----------------|
-| **`Lab Full Stack`** (default) | Compose infra + CloudShield + NetworkGuard + API + Vite + OutboxPublisher + FulfillmentWorker + ResultsWorker + ReconciliationWorker + NotificationService |
+| **`Lab Full Stack`** (default) | Shell → `scripts/lab-full-stack.sh` (Compose + simulators + API + Vite + workers) |
 | `Lab Infra (Compose)` | `scripts/lab-infra-up.sh` → `docker compose up -d` (Postgres/Kafka/Keycloak/…) |
 | `frontend` | `npm run dev` (Vite `:5173`) |
 | `EntitleX.Api` | API launch profile `http` (`:5080`) |

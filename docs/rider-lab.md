@@ -17,10 +17,13 @@ Shared configs live in both [`.run/`](../.run/) and [`.idea/runConfigurations/`]
    docker stop untitled-postgres-1 untitled-keycloak-1 2>/dev/null || true
    ```
 4. Run-configuration dropdown (top right) → **Lab Full Stack** → Run.  
+   This is a **Shell** config (same type as Lab Infra) that runs `scripts/lab-full-stack.sh`.  
    Also listed under **Run → Edit Configurations…**.
 5. Open http://localhost:5173 (API `:5080`, CloudShield `127.0.0.1:5081`, NetworkGuard `127.0.0.1:5082`).
 
 ## What Lab Full Stack starts
+
+`scripts/lab-full-stack.sh` brings up Compose, then starts these processes until you Ctrl+C:
 
 | Piece | Port / role |
 |-------|-------------|
@@ -33,7 +36,9 @@ Shared configs live in both [`.run/`](../.run/) and [`.idea/runConfigurations/`]
 
 Not included (run-once): ApprovalReminder / ExpirationNotification lambdas.
 
-## Smaller compounds
+## Other configs
 
-- **API + Frontend** — UI against an already-running infra + simulators
-- Individual `.run/*.run.xml` entries for single-process debug
+- **Lab Infra (Compose)** — Docker only
+- **Lab Full Stack (Compound)** — multi-debug compound (may be hidden in some Rider setups; prefer Shell **Lab Full Stack**)
+- **API + Frontend** — UI against already-running infra + simulators
+- Individual Launch Settings / npm configs for single-process debug

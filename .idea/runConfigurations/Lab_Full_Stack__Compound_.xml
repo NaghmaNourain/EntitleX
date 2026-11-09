@@ -1,0 +1,15 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Lab Full Stack (Compound)" type="CompoundRunConfigurationType" factoryName="Compound Run Configuration">
+    <toRun name="Lab Infra (Compose)" type="ShConfigurationType" />
+    <toRun name="CloudShield.Api" type="LaunchSettings" />
+    <toRun name="NetworkGuard.Api" type="LaunchSettings" />
+    <toRun name="EntitleX.Api" type="LaunchSettings" />
+    <toRun name="frontend" type="js.build_tools.npm" />
+    <toRun name="EntitleX.OutboxPublisher" type="LaunchSettings" />
+    <toRun name="EntitleX.FulfillmentWorker" type="LaunchSettings" />
+    <toRun name="EntitleX.ResultsWorker" type="LaunchSettings" />
+    <toRun name="EntitleX.ReconciliationWorker" type="LaunchSettings" />
+    <toRun name="EntitleX.NotificationService" type="LaunchSettings" />
+    <method v="2" />
+  </configuration>
+</component>
