@@ -1,4 +1,4 @@
-# EntitleX observability (Phase 11)
+# EntitleX observability (Phase 11 + hardening)
 
 ## Tracing (OpenTelemetry → Jaeger)
 
@@ -8,10 +8,13 @@
 - Instrumented:
   - ASP.NET Core + HttpClient + EF Core (AspNetCore hosts)
   - Custom sources: `EntitleX.Messaging`, `EntitleX.Saga`, `EntitleX.Outbox`, `EntitleX.Reconciliation`, `EntitleX.Providers`
-  - SQS/Kafka produce & consume; saga transitions; outbox publish; reconciliation passes
+  - SQS/Kafka **produce** injects `traceparent` / `tracestate`
+  - SQS/Kafka **consume** extracts parent context and starts a child `Activity` (`messaging.consume …`)
+  - Saga transitions; outbox publish; reconciliation passes
 - UI: Jaeger `http://localhost:16686`
+- Grafana: provisioned **Jaeger** datasource (`http://jaeger:16686`) alongside Prometheus
 
-Correlation continues via `X-Correlation-ID` (Serilog + outbound HTTP). Prefer joining on W3C trace id in Jaeger; correlation id remains for business logs.
+Business correlation continues via `X-Correlation-ID` (Serilog + outbound HTTP). Prefer joining on W3C `TraceId` in Jaeger; `CorrelationId` remains for business logs.
 
 ## Metrics (Prometheus + Grafana)
 
@@ -22,8 +25,9 @@ Correlation continues via `X-Correlation-ID` (Serilog + outbound HTTP). Prefer j
 | FulfillmentWorker | `http://localhost:9181/metrics` |
 | ReconciliationWorker | `http://localhost:9182/metrics` |
 | NotificationService | `http://localhost:9183/metrics` |
+| ResultsWorker | HttpListener `http://localhost:9184/metrics` |
 
-Prometheus Compose job scrapes `host.docker.internal` (see `infra/docker/prometheus/prometheus.yml`).
+Prometheus Compose jobs scrape `host.docker.internal` (see `infra/docker/prometheus/prometheus.yml`).
 
 ### Metric catalogue (no high-cardinality ID labels)
 
@@ -44,17 +48,24 @@ Prometheus Compose job scrapes `host.docker.internal` (see `infra/docker/prometh
 
 **Never** label by `requestId`, `messageId`, `logicalOperationId`, or raw URLs.
 
-Grafana: `http://localhost:3001` (admin/admin) — provisioned **EntitleX Overview** dashboard.
+Grafana: `http://localhost:3001` (admin/admin) — provisioned **EntitleX Overview** dashboard (links to Jaeger + Prometheus targets).
 
 ## Serilog
 
-Structured console logs with enrichers: `Service`, environment, machine name, `CorrelationId` (API middleware).
+Structured console logs with enrichers:
+
+| Property | Source |
+|----------|--------|
+| `Service` | host registration |
+| environment / machine | Serilog environment enrichers |
+| `CorrelationId` | `X-Correlation-ID` middleware (Api + CloudShield + NetworkGuard) |
+| `TraceId` / `SpanId` | `ActivityTraceEnricher` from `Activity.Current` (when a span is active) |
 
 ### CloudWatch (AWS path)
 
 Local Compose uses console sinks. For AWS deployments:
 
-1. Keep the same property names (`Service`, `CorrelationId`, `RequestId` when present as scalar properties — not metric labels).
+1. Keep the same property names (`Service`, `CorrelationId`, `TraceId`, `SpanId`, `RequestId` when present as scalar properties — not metric labels).
 2. Add `Serilog.Sinks.AwsCloudWatch` (or Fluent Bit / FireLens → CloudWatch Logs).
 3. Use log groups per service (`/entitlex/api`, `/entitlex/outbox-publisher`, …).
 4. Optionally ship OTLP to AWS X-Ray / ADOT collector instead of Jaeger; keep W3C propagation.
@@ -73,3 +84,12 @@ Do **not** emit high-cardinality metric dimensions to CloudWatch Metrics EMF for
   "EnableMetrics": true
 }
 ```
+
+Simulators use the same OTLP endpoint with their own `ServiceName`.
+
+## Lab verification
+
+1. Prefer **Lab Full Stack** / `scripts/lab-infra-up.sh` — they `docker compose up -d` and **force-recreate** Jaeger/Prometheus/Grafana so `prometheus.yml`, Jaeger datasource, and the overview dashboard always match the checkout.
+2. Prometheus → Status → Targets: jobs for api/sims/`9180`–`9184` should scrape (UP when hosts are running).
+3. Hit a control-plane API request; open Jaeger UI and find service `EntitleX.Api` (and linked messaging spans when fulfillment runs).
+4. Grafana `:3001` → dashboard **EntitleX Overview**; Explore → Jaeger datasource.

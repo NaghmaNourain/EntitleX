@@ -16,14 +16,10 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
-    builder.Host.UseSerilog((context, services, configuration) => configuration
-        .ReadFrom.Configuration(context.Configuration)
-        .ReadFrom.Services(services)
-        .Enrich.FromLogContext()
-        .Enrich.WithProperty("Service", "NetworkGuard.Api")
-        .Enrich.WithEnvironmentName()
-        .Enrich.WithMachineName()
-        .WriteTo.Console());
+    builder.Host.UseSerilog((context, services, configuration) =>
+        SerilogHostingExtensions.ApplySharedEnrichers(configuration, context.Configuration, "NetworkGuard.Api")
+            .ReadFrom.Services(services)
+            .WriteTo.Console());
 
     builder.Services.AddEntitleXOpenTelemetry(builder.Configuration, "NetworkGuard.Api", isAspNetCoreHost: true);
     builder.Services.AddSimulatorApiKeyAuth(builder.Configuration);
@@ -37,6 +33,7 @@ try
 
     var app = builder.Build();
 
+    app.UseEntitleXCorrelationId();
     app.UseSerilogRequestLogging();
     app.UseSimulatorApiKeyAuth();
 

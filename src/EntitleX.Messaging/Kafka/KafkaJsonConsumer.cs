@@ -19,6 +19,9 @@ public sealed class KafkaConsumedMessage
     public required int Partition { get; init; }
 
     public required long Offset { get; init; }
+
+    /// <summary>W3C parent context extracted from Kafka headers (if present).</summary>
+    public ActivityContext TraceContext { get; init; }
 }
 
 /// <summary>Thin Kafka consumer wrapper with graceful close.</summary>
@@ -53,9 +56,9 @@ public sealed class KafkaJsonConsumer : IDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
         var destination = "subscribed-topics";
-        using var activity = MessagingTelemetry.StartConsume("kafka", destination);
         var sw = Stopwatch.StartNew();
         var success = false;
+        Activity? activity = null;
 
         try
         {
@@ -67,6 +70,8 @@ public sealed class KafkaJsonConsumer : IDisposable
             }
 
             destination = result.Topic;
+            TraceContextPropagator.TryParseFromKafkaHeaders(result.Message.Headers, out var parent);
+            activity = MessagingTelemetry.StartConsume("kafka", destination, parent);
             activity?.SetTag("messaging.destination", destination);
 
             RefreshLagHook(result);
@@ -82,7 +87,8 @@ public sealed class KafkaJsonConsumer : IDisposable
                 Envelope = envelope,
                 Topic = result.Topic,
                 Partition = result.Partition.Value,
-                Offset = result.Offset.Value
+                Offset = result.Offset.Value,
+                TraceContext = parent
             };
         }
         catch (ConsumeException ex)
@@ -99,6 +105,7 @@ public sealed class KafkaJsonConsumer : IDisposable
                 destination,
                 sw.Elapsed.TotalSeconds,
                 success);
+            activity?.Dispose();
         }
     }
 

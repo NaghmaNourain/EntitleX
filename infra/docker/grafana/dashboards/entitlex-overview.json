@@ -4,12 +4,46 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Jaeger UI",
+      "tooltip": "Distributed traces",
+      "type": "link",
+      "url": "http://localhost:16686"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Prometheus",
+      "tooltip": "Scrape targets",
+      "type": "link",
+      "url": "http://localhost:9090/targets"
+    }
+  ],
   "panels": [
+    {
+      "title": "Lab observability links",
+      "type": "text",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "**Jaeger** http://localhost:16686 · **Prometheus targets** http://localhost:9090/targets · **Grafana** http://localhost:3001 (admin/admin)\\n\\nScrapes: Api `:5080`, CloudShield `:5081`, NetworkGuard `:5082`, Outbox `:9180`, Fulfillment `:9181`, Reconciliation `:9182`, Notification `:9183`, **ResultsWorker `:9184`**. Console Serilog includes `Service`, `CorrelationId`, `TraceId`, `SpanId`."
+      }
+    },
     {
       "title": "HTTP request duration (p95)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 3 },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, job))",
@@ -20,7 +54,7 @@
     {
       "title": "Approval latency (p95)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 3 },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(entitlex_approval_latency_seconds_bucket[5m])) by (le, stage_role))",
@@ -31,7 +65,7 @@
     {
       "title": "Fulfillment outcomes",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 11 },
       "targets": [
         {
           "expr": "sum(rate(entitlex_fulfillment_outcomes_total[5m])) by (outcome)",
@@ -42,7 +76,7 @@
     {
       "title": "Retries",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 11 },
       "targets": [
         {
           "expr": "sum(rate(entitlex_retries_total[5m])) by (source)",
@@ -53,7 +87,7 @@
     {
       "title": "Outbox backlog",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
       "targets": [
         {
           "expr": "entitlex_outbox_backlog",
@@ -64,7 +98,7 @@
     {
       "title": "Reconciliation backlog",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
       "targets": [
         {
           "expr": "entitlex_reconciliation_backlog",
@@ -75,7 +109,7 @@
     {
       "title": "SQS depth hook",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
       "targets": [
         {
           "expr": "entitlex_sqs_approximate_depth",
@@ -86,7 +120,7 @@
     {
       "title": "Kafka consumer lag hook",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
       "targets": [
         {
           "expr": "entitlex_kafka_consumer_lag_hook",
@@ -97,7 +131,7 @@
     {
       "title": "Provider latency (p95)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 27 },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(entitlex_provider_latency_seconds_bucket[5m])) by (le, provider))",
@@ -108,7 +142,7 @@
     {
       "title": "Circuit breaker transitions",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
       "targets": [
         {
           "expr": "sum(rate(entitlex_circuit_breaker_transitions_total[5m])) by (provider, state)",
@@ -119,7 +153,7 @@
     {
       "title": "Saga transitions",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
       "targets": [
         {
           "expr": "sum(rate(entitlex_saga_transitions_total[5m])) by (from_state, to_state)",

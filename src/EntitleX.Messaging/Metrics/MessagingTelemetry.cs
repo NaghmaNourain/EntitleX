@@ -17,15 +17,34 @@ internal static class MessagingTelemetry
         return activity;
     }
 
-    public static Activity? StartConsume(string transport, string destination)
+    public static Activity? StartConsume(
+        string transport,
+        string destination,
+        ActivityContext parentContext = default)
     {
-        var activity = EntitleXActivitySources.Messaging.StartActivity(
-            $"messaging.consume {transport}",
-            ActivityKind.Consumer);
+        Activity? activity;
+        if (parentContext != default)
+        {
+            activity = EntitleXActivitySources.Messaging.StartActivity(
+                $"messaging.consume {transport}",
+                ActivityKind.Consumer,
+                parentContext);
+        }
+        else
+        {
+            activity = EntitleXActivitySources.Messaging.StartActivity(
+                $"messaging.consume {transport}",
+                ActivityKind.Consumer);
+        }
 
         activity?.SetTag("messaging.system", transport);
         activity?.SetTag("messaging.destination", destination);
         activity?.SetTag("messaging.operation", "receive");
+        if (parentContext != default)
+        {
+            activity?.SetTag("messaging.trace_context", "extracted");
+        }
+
         return activity;
     }
 
