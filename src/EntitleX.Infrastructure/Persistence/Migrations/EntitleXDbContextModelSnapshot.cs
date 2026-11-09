@@ -948,6 +948,49 @@ namespace EntitleX.Infrastructure.Persistence.Migrations
                     b.ToTable("api_idempotency_records", "public");
                 });
 
+            modelBuilder.Entity("EntitleX.Infrastructure.Retry.HttpWriteIdempotencyRecord", b =>
+                {
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("ActorUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("operation");
+
+                    b.Property<string>("RequestFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("request_fingerprint");
+
+                    b.Property<string>("ResourceId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("resource_id");
+
+                    b.HasKey("IdempotencyKey");
+
+                    b.HasIndex("Operation", "ActorUserId")
+                        .HasDatabaseName("ix_http_write_idempotency_operation_actor");
+
+                    b.ToTable("http_write_idempotency_records", "public");
+                });
+
             modelBuilder.Entity("EntitleX.Infrastructure.Retry.RetryItemClaim", b =>
                 {
                     b.Property<Guid>("SourceRequestId")

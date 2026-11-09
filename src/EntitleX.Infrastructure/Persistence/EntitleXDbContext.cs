@@ -41,6 +41,8 @@ public sealed class EntitleXDbContext : DbContext, IUnitOfWork
 
     public DbSet<ApiIdempotencyRecord> ApiIdempotencyRecords => Set<ApiIdempotencyRecord>();
 
+    public DbSet<HttpWriteIdempotencyRecord> HttpWriteIdempotencyRecords => Set<HttpWriteIdempotencyRecord>();
+
     public DbSet<RetryItemClaim> RetryItemClaims => Set<RetryItemClaim>();
 
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
