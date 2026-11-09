@@ -148,6 +148,30 @@ variable "enable_ecs_services" {
   default     = false
 }
 
+variable "enable_ecr" {
+  description = "Create ECR repositories (negligible cost; needed before image push)."
+  type        = bool
+  default     = true
+}
+
+variable "enable_alb" {
+  description = "Create a public ALB + target group for the API (adds cost). Keep false for lab."
+  type        = bool
+  default     = false
+}
+
+variable "enable_alb_https" {
+  description = "When true and alb_certificate_arn is set, listen on 443 and redirect HTTP→HTTPS."
+  type        = bool
+  default     = false
+}
+
+variable "alb_certificate_arn" {
+  description = "ACM certificate ARN for HTTPS listener (optional)."
+  type        = string
+  default     = ""
+}
+
 variable "enable_lambda_schedules" {
   description = "Create Lambda functions + EventBridge schedules when package paths are provided."
   type        = bool

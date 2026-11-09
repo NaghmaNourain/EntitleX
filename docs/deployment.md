@@ -85,7 +85,16 @@ Integration tests use `DockerFact` — skip cleanly when Docker is unavailable.
 
 ### Manual AWS deploy — `.github/workflows/deploy-aws.yml`
 
-`workflow_dispatch` only (environment protection recommended). OIDC → `AWS_DEPLOY_ROLE_ARN`. Plan by default; apply gated by input. Reminder step: populate Secrets Manager and push images before `enable_ecs_services=true`.
+`workflow_dispatch` only (environment protection recommended). OIDC → `AWS_DEPLOY_ROLE_ARN`. Plan by default; apply gated by input.
+
+| Input | Default | Purpose |
+|-------|---------|---------|
+| `push_images` | `false` | Build/push API, workers, simulators to ECR |
+| `enable_ecs_services` | `false` | Create/update ECS services |
+| `enable_alb` | `false` | Public ALB (cost) + attach API target group when ECS is on |
+| `apply` | `false` | Run `terraform apply` |
+
+Populate Secrets Manager before enabling ECS. ECR repositories are created when `enable_ecr=true` (default).
 
 ## EventBridge schedules (stub + Terraform)
 

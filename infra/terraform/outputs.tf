@@ -45,6 +45,16 @@ output "ecs_cluster_name" {
   description = "ECS cluster name."
 }
 
+output "ecr_repository_urls" {
+  value       = module.ecr.repository_urls
+  description = "ECR repository URLs keyed by short name (api, outbox, ...)."
+}
+
+output "alb_dns_name" {
+  value       = module.alb.alb_dns_name
+  description = "Public ALB DNS name when enable_alb=true; empty otherwise."
+}
+
 output "cloudwatch_log_group_prefix" {
   value       = module.cloudwatch.log_group_prefix
   description = "CloudWatch Logs prefix for EntitleX services."

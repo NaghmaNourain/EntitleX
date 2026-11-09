@@ -77,6 +77,15 @@ resource "aws_ecs_service" "service" {
     assign_public_ip = false
   }
 
+  dynamic "load_balancer" {
+    for_each = each.key == "api" && var.api_target_group_arn != "" ? [1] : []
+    content {
+      target_group_arn = var.api_target_group_arn
+      container_name   = each.key
+      container_port   = coalesce(each.value.port, var.api_container_port)
+    }
+  }
+
   lifecycle {
     ignore_changes = [desired_count]
   }

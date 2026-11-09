@@ -87,6 +87,35 @@ resource "aws_security_group" "app" {
   tags = { Name = "${var.name_prefix}-app" }
 }
 
+resource "aws_security_group_rule" "app_from_alb" {
+  count                    = var.enable_alb ? 1 : 0
+  type                     = "ingress"
+  from_port                = 8080
+  to_port                  = 8080
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.app.id
+  source_security_group_id = module.alb.alb_security_group_id
+  description              = "API from ALB"
+}
+
+module "ecr" {
+  source      = "./modules/ecr"
+  name_prefix = var.name_prefix
+  environment = var.environment
+  enable      = var.enable_ecr
+}
+
+module "alb" {
+  source            = "./modules/alb"
+  name_prefix       = var.name_prefix
+  environment       = var.environment
+  enable            = var.enable_alb
+  enable_https      = var.enable_alb_https
+  certificate_arn   = var.alb_certificate_arn
+  vpc_id            = module.vpc.vpc_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+}
+
 module "rds" {
   source                = "./modules/rds"
   name_prefix           = var.name_prefix
@@ -160,6 +189,7 @@ module "ecs" {
   fulfillment_queue_name        = local.fulfillment_queue_name
   jwt_secret_arn                = module.secrets.secret_arns.jwt_signing_key
   connection_strings_secret_arn = module.secrets.secret_arns.connection_strings
+  api_target_group_arn          = var.enable_alb && var.enable_ecs_services ? module.alb.api_target_group_arn : ""
 }
 
 module "lambda" {
