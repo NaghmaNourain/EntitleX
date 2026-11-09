@@ -50,6 +50,24 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
+function collectCustomerIds(payload: Record<string, unknown> | null): string[] {
+  if (!payload) return []
+  const raw = payload.customer_ids
+  if (typeof raw === 'string') {
+    if (raw.includes(',')) {
+      return raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    }
+    return raw.trim() ? [raw.trim()] : []
+  }
+  if (Array.isArray(raw)) {
+    return raw.filter((v): v is string => typeof v === 'string' && v.trim().length > 0).map((v) => v.trim())
+  }
+  return []
+}
+
 function collectRoles(payload: Record<string, unknown> | null): EntitleXRole[] {
   if (!payload) return []
   const raw: string[] = []
@@ -95,6 +113,7 @@ export function authUserFromOidcUser(user: User): AuthUser | null {
     email: (typeof profile.email === 'string' && profile.email) || '',
     role: primary,
     roles,
+    customerIds: collectCustomerIds(payload),
   }
 }
 

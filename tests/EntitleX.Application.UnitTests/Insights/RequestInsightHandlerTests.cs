@@ -128,13 +128,14 @@ public sealed class RequestInsightHandlerTests
             Task.FromResult<string?>(null);
     }
 
-    private sealed class FakeCurrentUser(string userId, string[] roles) : ICurrentUser
+    private sealed class FakeCurrentUser(string userId, string[] roles, string[]? customerIds = null) : ICurrentUser
     {
         public bool IsAuthenticated => true;
         public string UserId => userId;
         public string DisplayName => userId;
         public string? Email => $"{userId}@test.local";
         public IReadOnlyCollection<string> Roles => roles;
+        public IReadOnlyList<string> CustomerIds => customerIds ?? [];
         public bool IsInRole(string role) => roles.Contains(role, StringComparer.OrdinalIgnoreCase);
     }
 

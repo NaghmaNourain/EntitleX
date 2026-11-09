@@ -13,6 +13,7 @@ export interface DevTokenResponse {
     displayName: string
     email: string
     role: EntitleXRole
+    customerIds?: string[]
   }
   usage: string
 }
@@ -25,6 +26,8 @@ export interface AuthUser {
   role: EntitleXRole
   /** All EntitleX roles present on the token (OIDC may grant more than one). */
   roles?: EntitleXRole[]
+  /** Customers the caller may access (JWT customer_ids). Empty for privileged cross-customer roles. */
+  customerIds?: string[]
 }
 
 export interface NormalizedEntitlement {

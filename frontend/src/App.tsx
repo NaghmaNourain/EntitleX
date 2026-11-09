@@ -53,7 +53,7 @@ export default function App() {
                 <Route
                   path="entitlements"
                   element={
-                    <RequireAuth roles={['DealDeskManager', 'PlatformAdmin']}>
+                    <RequireAuth roles={['RenewalRepresentative', 'DealDeskManager', 'PlatformAdmin']}>
                       <EntitlementSearchPage />
                     </RequireAuth>
                   }
@@ -61,7 +61,7 @@ export default function App() {
                 <Route
                   path="entitlements/:provider/:entitlementId"
                   element={
-                    <RequireAuth roles={['DealDeskManager', 'PlatformAdmin']}>
+                    <RequireAuth roles={['RenewalRepresentative', 'DealDeskManager', 'PlatformAdmin']}>
                       <EntitlementDetailsPage />
                     </RequireAuth>
                   }

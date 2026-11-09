@@ -14,6 +14,7 @@ public interface IJwtTokenService
         string displayName,
         string email,
         IEnumerable<string> roles,
+        IEnumerable<string>? customerIds = null,
         TimeSpan? lifetime = null);
 }
 
@@ -31,6 +32,7 @@ public sealed class JwtTokenService : IJwtTokenService
         string displayName,
         string email,
         IEnumerable<string> roles,
+        IEnumerable<string>? customerIds = null,
         TimeSpan? lifetime = null)
     {
         if (string.IsNullOrWhiteSpace(_options.SigningKey) || _options.SigningKey.Length < 32)
@@ -59,6 +61,17 @@ public sealed class JwtTokenService : IJwtTokenService
         };
 
         claims.AddRange(roleList.Select(r => new Claim(ClaimTypes.Role, r)));
+
+        if (customerIds is not null)
+        {
+            foreach (var customerId in customerIds
+                         .Where(c => !string.IsNullOrWhiteSpace(c))
+                         .Select(c => c.Trim())
+                         .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                claims.Add(new Claim(HttpCurrentUser.CustomerIdsClaimType, customerId));
+            }
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

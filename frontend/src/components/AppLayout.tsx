@@ -39,7 +39,7 @@ const NAV: NavItem[] = [
     to: '/entitlements',
     label: 'Entitlement search',
     icon: <SearchIcon />,
-    roles: ['DealDeskManager', 'PlatformAdmin'],
+    roles: ['RenewalRepresentative', 'DealDeskManager', 'PlatformAdmin'],
   },
   {
     to: '/extensions/new',

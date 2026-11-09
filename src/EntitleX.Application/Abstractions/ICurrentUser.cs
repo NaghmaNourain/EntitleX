@@ -13,5 +13,11 @@ public interface ICurrentUser
 
     IReadOnlyCollection<string> Roles { get; }
 
+    /// <summary>
+    /// Customer ids the caller may access (JWT <c>customer_ids</c> claim).
+    /// Empty means no customer-scoped ACL — privileged roles bypass via AuthZ service.
+    /// </summary>
+    IReadOnlyList<string> CustomerIds { get; }
+
     bool IsInRole(string role);
 }

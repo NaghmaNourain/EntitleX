@@ -1,5 +1,6 @@
 using EntitleX.Api.Middleware;
 using EntitleX.Application.EntitlementAggregation.SearchCustomerEntitlements;
+using EntitleX.Infrastructure.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +16,7 @@ public static class EntitlementAggregationEndpoints
         group.MapGet("/search", SearchAsync)
             .WithName("SearchCustomerEntitlements")
             .WithOpenApi()
-            .RequireAuthorization()
+            .RequireAuthorization(AuthorizationPolicies.CanSearchEntitlements)
             .Produces(StatusCodes.Status200OK)
             .ProducesValidationProblem();
 

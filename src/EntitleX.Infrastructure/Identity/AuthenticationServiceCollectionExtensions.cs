@@ -136,6 +136,13 @@ public static class AuthenticationServiceCollectionExtensions
                 AuthorizationPolicies.CanManageReconciliation,
                 policy => policy.RequireRole(
                     Domain.Identity.EntitleXRoles.PlatformAdmin));
+
+            options.AddPolicy(
+                AuthorizationPolicies.CanSearchEntitlements,
+                policy => policy.RequireRole(
+                    Domain.Identity.EntitleXRoles.RenewalRepresentative,
+                    Domain.Identity.EntitleXRoles.DealDeskManager,
+                    Domain.Identity.EntitleXRoles.PlatformAdmin));
         });
 
         return services;
@@ -242,6 +249,7 @@ public static class AuthenticationServiceCollectionExtensions
                 if (context.Principal?.Identity is ClaimsIdentity identity)
                 {
                     OidcRoleClaimMapper.ApplyRoleClaims(identity, oidc);
+                    OidcCustomerClaimMapper.ApplyCustomerClaims(identity);
 
                     // Prefer human-readable name when Keycloak sends "name".
                     if (identity.FindFirst(ClaimTypes.Name) is null)
@@ -305,4 +313,5 @@ public static class AuthorizationPolicies
     public const string CanDecideApprovals = "CanDecideApprovals";
     public const string CanReadApprovals = "CanReadApprovals";
     public const string CanManageReconciliation = "CanManageReconciliation";
+    public const string CanSearchEntitlements = "CanSearchEntitlements";
 }

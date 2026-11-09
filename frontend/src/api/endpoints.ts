@@ -16,10 +16,10 @@ import type {
 } from './types'
 
 export const api = {
-  mintDevToken(role: EntitleXRole) {
+  mintDevToken(role: EntitleXRole, customerIds?: string[]) {
     return apiRequest<DevTokenResponse>('/api/v1/dev/tokens', {
       method: 'POST',
-      body: { role },
+      body: { role, customerIds: customerIds?.length ? customerIds : undefined },
       auth: false,
     })
   },

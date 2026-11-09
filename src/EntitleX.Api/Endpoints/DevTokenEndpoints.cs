@@ -58,12 +58,19 @@ public static class DevTokenEndpoints
             });
         }
 
+        var customerIds = (request.CustomerIds ?? [])
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Select(c => c.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
         var seed = DevUserDirectory.Resolve(request.Role);
         var token = tokens.CreateToken(
             seed.UserId,
             seed.DisplayName,
             seed.Email,
-            [request.Role]);
+            [request.Role],
+            customerIds);
 
         return Results.Ok(new
         {
@@ -75,14 +82,15 @@ public static class DevTokenEndpoints
                 seed.UserId,
                 seed.DisplayName,
                 seed.Email,
-                role = request.Role
+                role = request.Role,
+                customerIds
             },
             usage = "Authorization: Bearer <accessToken>"
         });
     }
 }
 
-public sealed record DevTokenRequest(string Role);
+public sealed record DevTokenRequest(string Role, IReadOnlyList<string>? CustomerIds = null);
 
 internal static class DevUserDirectory
 {
