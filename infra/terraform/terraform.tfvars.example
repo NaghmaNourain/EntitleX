@@ -3,6 +3,8 @@
 
 aws_region  = "us-east-1"
 environment = "lab"
+# Host runtime env (OIDC / DevToken guards). Keep separate from the lab resource tag.
+aspnetcore_environment = "Production"
 name_prefix = "entitlex"
 
 enable_nat_gateway = true

@@ -1,5 +1,9 @@
 variable "name_prefix" { type = string }
 variable "environment" { type = string }
+variable "aspnetcore_environment" {
+  type    = string
+  default = "Production"
+}
 variable "aws_region" { type = string }
 variable "private_subnet_ids" { type = list(string) }
 variable "security_group_id" { type = string }

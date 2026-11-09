@@ -147,6 +147,7 @@ module "ecs" {
   source                        = "./modules/ecs"
   name_prefix                   = var.name_prefix
   environment                   = var.environment
+  aspnetcore_environment        = var.aspnetcore_environment
   aws_region                    = var.aws_region
   private_subnet_ids            = module.vpc.private_subnet_ids
   security_group_id             = aws_security_group.app.id
@@ -165,6 +166,7 @@ module "lambda" {
   source                               = "./modules/lambda"
   name_prefix                          = var.name_prefix
   environment                          = var.environment
+  aspnetcore_environment               = var.aspnetcore_environment
   enable                               = var.enable_lambda_schedules
   lambda_role_arn                      = module.iam.lambda_role_arn
   subnet_ids                           = module.vpc.private_subnet_ids

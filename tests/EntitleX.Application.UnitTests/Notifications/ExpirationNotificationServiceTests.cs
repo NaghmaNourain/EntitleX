@@ -146,6 +146,12 @@ public sealed class ExpirationNotificationServiceTests
             Task.FromResult<IReadOnlyList<NormalizedEntitlementDto>>(
                 entitlements.Where(e => e.CustomerId == customerId).ToList());
 
+        public Task<NormalizedEntitlementDto?> GetByEntitlementIdAsync(
+            string entitlementId,
+            string correlationId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(entitlements.FirstOrDefault(e => e.EntitlementId == entitlementId));
+
         public Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
     }

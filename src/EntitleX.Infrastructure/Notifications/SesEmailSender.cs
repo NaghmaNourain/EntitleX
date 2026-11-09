@@ -3,6 +3,7 @@ using Amazon.Runtime;
 using Amazon.SimpleEmail;
 using Amazon.SimpleEmail.Model;
 using EntitleX.Application.Abstractions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -15,29 +16,52 @@ public sealed class SesEmailSender : IEmailSender, IAsyncDisposable
     private readonly ILogger<SesEmailSender> _logger;
     private readonly AmazonSimpleEmailServiceClient _client;
 
-    public SesEmailSender(IOptions<EmailOptions> options, ILogger<SesEmailSender> logger)
+    public SesEmailSender(
+        IOptions<EmailOptions> options,
+        ILogger<SesEmailSender> logger,
+        IHostEnvironment environment)
     {
         _options = options.Value;
         _logger = logger;
+        _client = CreateClient(_options.Ses, environment);
+    }
 
-        var credentials = new BasicAWSCredentials(
-            _options.Ses.AccessKey,
-            _options.Ses.SecretKey);
-
+    public static AmazonSimpleEmailServiceClient CreateClient(
+        SesEmailOptions ses,
+        IHostEnvironment environment)
+    {
         var config = new AmazonSimpleEmailServiceConfig
         {
-            RegionEndpoint = RegionEndpoint.GetBySystemName(_options.Ses.Region),
-            ServiceURL = _options.Ses.ServiceUrl,
-            AuthenticationRegion = _options.Ses.Region
+            RegionEndpoint = RegionEndpoint.GetBySystemName(ses.Region)
         };
 
-        // LocalStack uses path-style / custom endpoint.
-        if (!string.IsNullOrWhiteSpace(_options.Ses.ServiceUrl))
+        var hasCustomEndpoint = !string.IsNullOrWhiteSpace(ses.ServiceUrl);
+        if (hasCustomEndpoint)
         {
-            config.ServiceURL = _options.Ses.ServiceUrl;
+            config.ServiceURL = ses.ServiceUrl;
+            config.AuthenticationRegion = ses.Region;
         }
 
-        _client = new AmazonSimpleEmailServiceClient(credentials, config);
+        var accessKey = ses.AccessKey?.Trim() ?? string.Empty;
+        var secretKey = ses.SecretKey?.Trim() ?? string.Empty;
+        var usesTestKeys = string.Equals(accessKey, "test", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(secretKey, "test", StringComparison.OrdinalIgnoreCase);
+
+        if (usesTestKeys && !environment.IsDevelopment())
+        {
+            throw new InvalidOperationException(
+                "Email:Ses AccessKey/SecretKey must not be 'test' outside Development. " +
+                "Leave ServiceUrl empty to use the default AWS credential chain (task role / instance profile).");
+        }
+
+        if (!hasCustomEndpoint)
+        {
+            return new AmazonSimpleEmailServiceClient(config);
+        }
+
+        return new AmazonSimpleEmailServiceClient(
+            new BasicAWSCredentials(accessKey, secretKey),
+            config);
     }
 
     public async Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)

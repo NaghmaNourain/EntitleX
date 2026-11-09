@@ -1,5 +1,6 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Common.Exceptions;
+using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Application.EntitlementAggregation.Models;
 using EntitleX.Application.Fulfillment;
 using EntitleX.Application.LicenseExtension.CreateLicenseExtensionRequest;
@@ -46,7 +47,8 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
             orchestrator,
             unitOfWork,
             notifications,
-            currentUser);
+            currentUser,
+            [new FakeEntitlementClient("CloudShield", Baseline)]);
 
         var dto = await handler.Handle(
             new CreateLicenseExtensionRequestCommand(
@@ -56,12 +58,13 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
                     new CreateLicenseExtensionRequestItemDto(
                         "ent-cs-1",
                         "CloudShield",
-                        Baseline,
+                        Baseline.AddDays(-90), // client lie — server uses provider expiry
                         Baseline.AddDays(14))
                 ]),
             CancellationToken.None);
 
         Assert.Equal(LicenseExtensionRequestStatus.InFulfillment.ToString(), dto.Status);
+        Assert.Equal(Baseline, requests.Store.Values.Single().Items[0].CurrentExpiryUtc);
         Assert.Equal("user-rep-001", dto.RequestedBy);
         Assert.NotNull(outbox.LastEnvelope);
         Assert.Equal(MessageTypes.FulfillmentCommand, outbox.LastEnvelope!.MessageType);
@@ -88,7 +91,8 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
             CreateOrchestrator(sagas, requests, outbox),
             new CapturingUnitOfWork(),
             new NoopNotifications(),
-            currentUser);
+            currentUser,
+            [new FakeEntitlementClient("CloudShield", Baseline)]);
 
         var dto = await handler.Handle(
             new CreateLicenseExtensionRequestCommand(
@@ -115,7 +119,8 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
             CreateOrchestrator(new UnsavedBlindSagaRepository(), new FakeRequestRepository(), new CapturingOutboxWriter()),
             new CapturingUnitOfWork(),
             new NoopNotifications(),
-            new FakeCurrentUser(string.Empty, string.Empty, [], authenticated: false));
+            new FakeCurrentUser(string.Empty, string.Empty, [], authenticated: false),
+            [new FakeEntitlementClient("CloudShield", Baseline)]);
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(
@@ -148,7 +153,8 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
             orchestrator,
             unitOfWork,
             new NoopNotifications(),
-            new FakeCurrentUser("user-rep-001", "Riley Rep", [EntitleXRoles.RenewalRepresentative]));
+            new FakeCurrentUser("user-rep-001", "Riley Rep", [EntitleXRoles.RenewalRepresentative]),
+            [new FakeEntitlementClient("CloudShield", Baseline)]);
 
         var dto = await handler.Handle(
             new CreateLicenseExtensionRequestCommand(
@@ -300,6 +306,35 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
         public string? Email => string.IsNullOrEmpty(userId) ? null : $"{userId}@entitlex.local";
         public IReadOnlyCollection<string> Roles => roles;
         public bool IsInRole(string role) => roles.Contains(role, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private sealed class FakeEntitlementClient(string providerName, DateTimeOffset expiry)
+        : IProviderEntitlementClient
+    {
+        public string ProviderName => providerName;
+
+        public Task<IReadOnlyList<NormalizedEntitlementDto>> DiscoverByCustomerAsync(
+            string customerId,
+            string correlationId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<NormalizedEntitlementDto>>([]);
+
+        public Task<NormalizedEntitlementDto?> GetByEntitlementIdAsync(
+            string entitlementId,
+            string correlationId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<NormalizedEntitlementDto?>(new NormalizedEntitlementDto(
+                entitlementId,
+                providerName,
+                "CUST-1",
+                "SKU",
+                null,
+                entitlementId,
+                expiry,
+                null));
+
+        public Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
     }
 
     private sealed class NoopNotifications : IApprovalNotificationService

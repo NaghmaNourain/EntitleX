@@ -12,6 +12,12 @@ public interface IProviderEntitlementClient
         string correlationId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Idempotent GET of a single entitlement by provider key.</summary>
+    Task<NormalizedEntitlementDto?> GetByEntitlementIdAsync(
+        string entitlementId,
+        string correlationId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Idempotent readiness probe (typically GET /health).</summary>
     Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default);
 }

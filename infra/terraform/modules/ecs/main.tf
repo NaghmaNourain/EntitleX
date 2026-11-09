@@ -34,7 +34,7 @@ resource "aws_ecs_task_definition" "service" {
         protocol      = "tcp"
       }] : []
       environment = [
-        { name = "ASPNETCORE_ENVIRONMENT", value = var.environment },
+        { name = "ASPNETCORE_ENVIRONMENT", value = var.aspnetcore_environment },
         { name = "Email__Provider", value = "Ses" },
         { name = "Email__FromAddress", value = var.ses_from_address },
         { name = "Email__AppBaseUrl", value = var.app_base_url },

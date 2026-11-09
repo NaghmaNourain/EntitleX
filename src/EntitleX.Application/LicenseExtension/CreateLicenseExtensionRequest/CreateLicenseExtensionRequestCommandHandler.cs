@@ -1,8 +1,10 @@
 using EntitleX.Application.Abstractions;
 using EntitleX.Application.Common.Exceptions;
+using EntitleX.Application.EntitlementAggregation.Abstractions;
 using EntitleX.Application.LicenseExtension.Models;
 using EntitleX.BuildingBlocks.Ids;
 using EntitleX.Domain.Approval;
+using EntitleX.Domain.Identity;
 using EntitleX.Domain.LicenseExtension;
 using MediatR;
 
@@ -17,6 +19,7 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IApprovalNotificationService _notifications;
     private readonly ICurrentUser _currentUser;
+    private readonly IReadOnlyDictionary<string, IProviderEntitlementClient> _providers;
 
     public CreateLicenseExtensionRequestCommandHandler(
         ILicenseExtensionRequestRepository repository,
@@ -24,7 +27,8 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
         ILicenseExtensionSagaOrchestrator sagaOrchestrator,
         IUnitOfWork unitOfWork,
         IApprovalNotificationService notifications,
-        ICurrentUser currentUser)
+        ICurrentUser currentUser,
+        IEnumerable<IProviderEntitlementClient> providers)
     {
         _repository = repository;
         _approvalRepository = approvalRepository;
@@ -32,6 +36,9 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
         _unitOfWork = unitOfWork;
         _notifications = notifications;
         _currentUser = currentUser;
+        _providers = providers.ToDictionary(
+            p => p.ProviderName,
+            StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<LicenseExtensionRequestDto> Handle(
@@ -41,6 +48,13 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
         if (!_currentUser.IsAuthenticated || string.IsNullOrWhiteSpace(_currentUser.UserId))
         {
             throw new ForbiddenException("Authentication is required to create a request.");
+        }
+
+        if (!_currentUser.IsInRole(EntitleXRoles.RenewalRepresentative)
+            && !_currentUser.IsInRole(EntitleXRoles.PlatformAdmin))
+        {
+            throw new ForbiddenException(
+                "Creating license-extension requests requires RenewalRepresentative or PlatformAdmin.");
         }
 
         // Bind actor from authenticated identity — never from the client body.
@@ -56,11 +70,36 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
                 $"A license-extension request with ExtensionNumber '{extensionNumber}' already exists.");
         }
 
-        var items = request.Items.Select(i => (
-            EntitlementId: EntitlementId.From(i.EntitlementId),
-            Provider: Enum.Parse<ProviderSystem>(i.Provider, ignoreCase: true),
-            CurrentExpiryUtc: i.CurrentExpiryUtc,
-            RequestedExpiryUtc: i.RequestedExpiryUtc));
+        var correlationId = Guid.NewGuid().ToString("D");
+        var items = new List<(
+            EntitlementId EntitlementId,
+            ProviderSystem Provider,
+            DateTimeOffset CurrentExpiryUtc,
+            DateTimeOffset RequestedExpiryUtc)>();
+
+        foreach (var item in request.Items)
+        {
+            var provider = Enum.Parse<ProviderSystem>(item.Provider, ignoreCase: true);
+            if (!_providers.TryGetValue(provider.ToString(), out var client))
+            {
+                throw new ConflictException(
+                    $"No entitlement client is registered for provider '{item.Provider}'.");
+            }
+
+            var entitlement = await client.GetByEntitlementIdAsync(
+                item.EntitlementId,
+                correlationId,
+                cancellationToken)
+                ?? throw new NotFoundException(
+                    $"Entitlement '{item.EntitlementId}' was not found at provider '{provider}'.");
+
+            // Always use provider-sourced expiry — client baselines are hints only.
+            items.Add((
+                EntitlementId.From(item.EntitlementId),
+                provider,
+                entitlement.ExpiryUtc,
+                item.RequestedExpiryUtc));
+        }
 
         var aggregate = LicenseExtensionRequest.CreateFresh(
             extensionNumber,
@@ -75,9 +114,6 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
 
         ApplyInitialApprovalTransition(aggregate, band);
 
-        // Must start (and retain) the saga before fulfillment dispatch. Auto-approve
-        // paths enqueue outbox in the same unit of work before SaveChanges; the
-        // orchestrator keeps the in-scope saga so Dispatch does not re-query the DB.
         _ = await _sagaOrchestrator.StartForRequestAsync(
             aggregate,
             band,

@@ -56,6 +56,43 @@ public sealed class CloudShieldEntitlementClient : IProviderEntitlementClient
             e.UpdatedAtUtc)).ToList();
     }
 
+    public async Task<NormalizedEntitlementDto?> GetByEntitlementIdAsync(
+        string entitlementId,
+        string correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        CorrelationContext.Current = correlationId;
+        var client = _httpClientFactory.CreateClient(ProviderHttpClientNames.CloudShield);
+
+        using var response = await client.GetAsync(
+            $"api/v1/entitlements/{Uri.EscapeDataString(entitlementId)}",
+            cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        var e = await response.Content.ReadFromJsonAsync<CloudShieldEntitlementResponse>(
+            cancellationToken: cancellationToken);
+        if (e is null)
+        {
+            return null;
+        }
+
+        return new NormalizedEntitlementDto(
+            e.EntitlementKey,
+            ProviderName,
+            e.CustomerAccountId,
+            e.ProductCode,
+            e.ProductGroup,
+            e.DisplayName,
+            e.ExpiresAtUtc,
+            e.UpdatedAtUtc);
+    }
+
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         var client = _httpClientFactory.CreateClient(ProviderHttpClientNames.CloudShield);

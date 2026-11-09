@@ -56,6 +56,43 @@ public sealed class NetworkGuardEntitlementClient : IProviderEntitlementClient
             e.UpdatedAtUtc)).ToList();
     }
 
+    public async Task<NormalizedEntitlementDto?> GetByEntitlementIdAsync(
+        string entitlementId,
+        string correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        CorrelationContext.Current = correlationId;
+        var client = _httpClientFactory.CreateClient(ProviderHttpClientNames.NetworkGuard);
+
+        using var response = await client.GetAsync(
+            $"api/v1/licenses/{Uri.EscapeDataString(entitlementId)}",
+            cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        var e = await response.Content.ReadFromJsonAsync<NetworkGuardLicenseResponse>(
+            cancellationToken: cancellationToken);
+        if (e is null)
+        {
+            return null;
+        }
+
+        return new NormalizedEntitlementDto(
+            e.LicenseId,
+            ProviderName,
+            e.TenantExternalId,
+            e.SkuCode,
+            e.LicenseGroup,
+            e.DisplayName,
+            e.ValidUntilUtc,
+            e.UpdatedAtUtc);
+    }
+
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         var client = _httpClientFactory.CreateClient(ProviderHttpClientNames.NetworkGuard);
