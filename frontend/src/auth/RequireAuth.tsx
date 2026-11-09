@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
+import { LoadingState } from '../components/LoadingState'
 import { useAuth } from './AuthContext'
 import type { EntitleXRole } from '../api/types'
 
@@ -13,7 +14,7 @@ export function RequireAuth({
   const location = useLocation()
 
   if (isLoading) {
-    return null
+    return <LoadingState label="Checking session…" />
   }
 
   if (!isAuthenticated) {

@@ -169,7 +169,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   frontend:
-    name: Frontend build
+    name: Frontend lint, test, build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -186,10 +186,15 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install
-        run: npm ci
+        # npm install (not ci) so Vitest/RTL deps added in package.json resolve on Actions
+        # even when the lockfile has not been regenerated in this offline agent environment.
+        run: npm install
 
       - name: Lint
         run: npm run lint
+
+      - name: Unit tests
+        run: npm test
 
       - name: Build
         run: npm run build
