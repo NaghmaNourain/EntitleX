@@ -67,7 +67,7 @@ public static class RateLimitingExtensions
 
                 if (authenticated)
                 {
-                    var user = httpContext.User;
+                    var user = httpContext.User!;
                     partitionKey = "user:" + (
                         user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                         ?? user.FindFirst("sub")?.Value
@@ -98,11 +98,19 @@ public static class RateLimitingExtensions
 
             limiter.AddPolicy(WritePolicy, httpContext =>
             {
-                var partitionKey = httpContext.User?.Identity?.IsAuthenticated == true
-                    ? httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                      ?? httpContext.User.FindFirst("sub")?.Value
-                      ?? "authenticated"
-                    : httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+                string partitionKey;
+                if (httpContext.User?.Identity?.IsAuthenticated == true)
+                {
+                    var user = httpContext.User!;
+                    partitionKey =
+                        user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                        ?? user.FindFirst("sub")?.Value
+                        ?? "authenticated";
+                }
+                else
+                {
+                    partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+                }
 
                 var permitLimit = options.Enabled
                     ? Math.Max(1, options.WritePermitLimit)

@@ -64,6 +64,14 @@ public sealed class EfRetryClaimStore : IRetryClaimStore
             distinct,
             cancellationToken);
 
+        // AsNoTracking still sees rows that ReleaseClaims marked Deleted but has not
+        // flushed yet — exclude those so a same-context reclaim can proceed.
+        var pendingDeletedLogicalIds = _db.RetryItemClaims.Local
+            .Where(x => x.SourceRequestId == sourceRequestId
+                        && _db.Entry(x).State == EntityState.Deleted)
+            .Select(x => x.LogicalOperationId)
+            .ToHashSet();
+
         var existingClaims = await _db.RetryItemClaims
             .AsNoTracking()
             .Where(x => x.SourceRequestId == sourceRequestId)
@@ -72,6 +80,7 @@ public sealed class EfRetryClaimStore : IRetryClaimStore
 
         var activeClaimedIds = existingClaims
             .Select(x => x.LogicalOperationId)
+            .Where(id => !pendingDeletedLogicalIds.Contains(id))
             .Concat(
                 _db.RetryItemClaims.Local
                     .Where(x => x.SourceRequestId == sourceRequestId
