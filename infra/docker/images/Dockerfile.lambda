@@ -10,7 +10,7 @@ COPY src/ ./src/
 RUN dotnet restore "${PROJECT_PATH}" \
  && dotnet publish "${PROJECT_PATH}" -c Release -o /app/publish --no-restore
 
-FROM public.ecr.aws/lambda/dotnet:8 AS final
+FROM public.ecr.aws/lambda/dotnet:10 AS final
 ARG DLL_NAME
 WORKDIR /var/task
 COPY --from=build /app/publish .
