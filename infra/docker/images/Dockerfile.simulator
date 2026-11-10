@@ -9,7 +9,7 @@ COPY src/ ./src/
 RUN dotnet restore "${PROJECT_PATH}" \
  && dotnet publish "${PROJECT_PATH}" -c Release -o /app/publish --no-restore
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 ARG DLL_NAME
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:8080
