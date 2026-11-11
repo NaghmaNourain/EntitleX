@@ -164,17 +164,31 @@ public sealed class ReconciliationServiceTests
         LicenseExtensionSaga saga,
         IProviderOperationStatusClient provider,
         InMemoryLocalOutcomes local,
-        InMemoryAudit audit) =>
-        new(
+        InMemoryAudit audit,
+        ReconciliationAgingOptions? aging = null)
+    {
+        var agingOptions = Options.Create(aging ?? new ReconciliationAgingOptions { UncertainMaxAgeDays = 0 });
+        var applier = new ReconciliationApplier(
+            local,
+            audit,
+            agingOptions,
+            NullLogger<ReconciliationApplier>.Instance);
+        var planner = new ReconciliationPlanner(
+            [provider],
+            applier,
+            NullLogger<ReconciliationPlanner>.Instance);
+        return new ReconciliationService(
             new FakeSagaRepository(saga),
             new FakeRequestRepository(request),
             new NoopOrchestrator(),
-            [provider],
             local,
             audit,
             new FakeUnitOfWork(),
-            Options.Create(new ReconciliationAgingOptions { UncertainMaxAgeDays = 0 }),
+            new ReconciliationDetector(),
+            planner,
+            applier,
             NullLogger<ReconciliationService>.Instance);
+    }
 
     private static (LicenseExtensionRequest Request, LicenseExtensionSaga Saga) CreateUncertainRequest()
     {

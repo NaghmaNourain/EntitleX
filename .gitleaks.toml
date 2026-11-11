@@ -1,0 +1,28 @@
+# Gitleaks config for EntitleX.
+# Lab/demo placeholders are intentional (local Compose / DevToken / simulators).
+# Production secrets must come from Secrets Manager / CI secrets — never commit them.
+
+title = "EntitleX"
+
+[allowlist]
+description = "Documented lab fixtures and tests — not production credentials"
+paths = [
+  '''(?i)appsettings\.development\.json$''',
+  '''(?i)infra/docker/keycloak/realm-entitlex\.json$''',
+  '''(?i)(^|/)docker-compose\.ya?ml$''',
+  '''(?i)src/simulators/.+/appsettings\.json$''',
+  '''(?i)^tests/''',
+  '''(?i)^docs/guides/''',
+  '''(?i)\.gitleaks\.toml$''',
+]
+regexTarget = "match"
+regexes = [
+  '''EntitleX-Dev-Only-Signing-Key-Change-Me-32\+''',
+  '''EntitleX-Api-Tests-Signing-Key-32chars!''',
+  '''EntitleX-(Should-Not-Matter|Prod|Staging)-[A-Za-z0-9+-]+''',
+  '''entitlex-lab-simulator-key-change-me''',
+  '''Password=entitlex''',
+  '''KEYCLOAK_ADMIN_PASSWORD:\s*admin''',
+  '''GF_SECURITY_ADMIN_PASSWORD:\s*admin''',
+  '''"value":\s*"demo"''',
+]

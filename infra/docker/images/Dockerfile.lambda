@@ -14,5 +14,11 @@ FROM public.ecr.aws/lambda/dotnet:10 AS final
 ARG DLL_NAME
 WORKDIR /var/task
 COPY --from=build /app/publish .
+# Prefer non-root when the Lambda base image provides a numeric APP_UID-compatible user.
+# Fall back to uid 10001 named `app` for local container runs.
+RUN (id -u app >/dev/null 2>&1) || (useradd -r -u 10001 app 2>/dev/null || adduser -D -u 10001 app 2>/dev/null || true)
+USER 10001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD ["/bin/sh", "-c", "test -f /var/task/EntitleX.ApprovalReminder.dll -o -f /var/task/*.dll"]
 # Handler is set via Terraform/Lambda config; default CMD for container image
 CMD ["EntitleX.ApprovalReminder::EntitleX.ApprovalReminder.Function::FunctionHandler"]

@@ -33,7 +33,6 @@ public static class DependencyInjection
         services.AddScoped<IResourceAuthorizationService, ResourceAuthorizationService>();
         services.AddScoped<IEntitlementAggregationService, EntitlementAggregationService>();
         services.AddScoped<IReconciliationGate, ReconciliationGate>();
-        services.AddScoped<IReconciliationService, ReconciliationService>();
         services.Configure<ReconciliationAgingOptions>(_ => { });
         services.AddScoped<IRequestInsightContextBuilder, RequestInsightContextBuilder>();
         services.AddSingleton<DeterministicInsightComposer>();
@@ -51,6 +50,9 @@ public static class DependencyInjection
         services.AddScoped<IFulfillmentOutboxService, FulfillmentOutboxService>();
         services.AddScoped<ILicenseExtensionSagaOrchestrator, LicenseExtensionSagaOrchestrator>();
         services.AddScoped<ISagaTimeoutHook, LoggingSagaTimeoutHook>();
+        services.AddScoped<ReconciliationDetector>();
+        services.AddScoped<ReconciliationApplier>();
+        services.AddScoped<ReconciliationPlanner>();
         services.AddScoped<IReconciliationService, ReconciliationService>();
         return services;
     }

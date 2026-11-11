@@ -298,13 +298,22 @@ public static class AuthenticationServiceCollectionExtensions
             ValidAudience = jwt.Audience,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwt.SigningKey)),
+                Encoding.UTF8.GetBytes(jwt.SigningKey))
+            {
+                KeyId = JwtHmacKey.KeyId
+            },
+            TryAllIssuerSigningKeys = true,
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1),
             RoleClaimType = ClaimTypes.Role,
             NameClaimType = ClaimTypes.Name
         };
     }
+}
+
+internal static class JwtHmacKey
+{
+    public const string KeyId = "entitlex-dev-hmac";
 }
 
 public static class AuthorizationPolicies
