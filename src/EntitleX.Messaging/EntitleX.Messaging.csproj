@@ -6,7 +6,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AWSSDK.SQS" Version="4.0.100.25" />
+    <!-- Keep on AWS SDK v3 until AWSSDK.SimpleEmail is bumped to v4 (NU1107 Core clash). -->
+    <PackageReference Include="AWSSDK.SQS" Version="3.7.400.58" />
     <PackageReference Include="Confluent.Kafka" Version="2.16.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
