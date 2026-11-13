@@ -23,7 +23,7 @@ Enterprise license-extension platform (portfolio). Orchestrates extension reques
 
 ## Prerequisites
 
-- [.NET SDK 8.x](https://dotnet.microsoft.com/download/dotnet/8.0) (see `global.json`)
+- [.NET SDK 9.x](https://dotnet.microsoft.com/download/dotnet/9.0) (see `global.json`; apps still target `net8.0`)
 - Node.js 20+ / 22 and npm (frontend)
 - Docker + Docker Compose (local dependencies; integration tests use Testcontainers)
 

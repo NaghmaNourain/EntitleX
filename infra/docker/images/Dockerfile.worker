@@ -2,7 +2,7 @@
 # Build args: PROJECT_PATH (csproj relative), DLL_NAME
 ARG PROJECT_PATH=src/workers/EntitleX.OutboxPublisher/EntitleX.OutboxPublisher.csproj
 ARG DLL_NAME=EntitleX.OutboxPublisher.dll
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG PROJECT_PATH
 WORKDIR /src
 COPY Directory.Build.props global.json EntitleX.sln ./
