@@ -56,10 +56,11 @@ public sealed class ThousandItemMixedOutcomeScenario
         Assert.NotEqual(TotalItems, retryItemCount);
     }
 
-    // Gated live harness: remove Skip and use [E2EFact] once HTTP drive against Compose is wired.
-    [Fact(Skip =
-        "Live Compose harness is scaffolded only (1000/970/30 + retry lineage). " +
-        "Implement against ENTITLEX_E2E=1 + docker compose; see thousand-item-mixed-outcome.md.")]
+    /// <summary>
+    /// Live Compose harness — gated by <see cref="E2EFactAttribute"/> (<c>ENTITLEX_E2E=1</c> + Docker).
+    /// Soft-fails with Assert until HTTP drive is implemented (see companion .md).
+    /// </summary>
+    [E2EFact]
     public void Full_stack_1000_item_mixed_outcome_then_retry_lineage()
     {
         // Intended steps:
@@ -68,6 +69,9 @@ public sealed class ThousandItemMixedOutcomeScenario
         // 3. Wait for saga PartiallyCompleted / PartiallyFulfilled (970 Succeeded, 30 Failed).
         // 4. POST retry-failed with Idempotency-Key; assert ParentId + preserved LogicalOperationIds.
         // 5. Re-run fulfillment; assert Completed + unique AppliedLicenseOperation rows.
+        Assert.Fail(
+            "HTTP Compose drive not implemented yet. Keep ENTITLEX_E2E unset in PR CI; " +
+            "set ENTITLEX_E2E=1 locally when wiring the harness.");
         Assert.True(InfrastructureAvailability.CanRunFullScenario);
     }
 }

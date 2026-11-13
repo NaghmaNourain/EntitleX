@@ -160,6 +160,7 @@ module "iam" {
   fulfillment_queue_arn = module.sqs.fulfillment_queue_arn
   fulfillment_dlq_arn   = module.sqs.fulfillment_dlq_arn
   audit_bucket_arn      = module.s3_audit.bucket_arn
+  ses_identity_arn      = module.messaging.ses_from_identity_arn
 }
 
 module "cloudwatch" {

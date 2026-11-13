@@ -55,6 +55,9 @@ export interface CustomerEntitlementAggregation {
   entitlements: NormalizedEntitlement[]
   providers: ProviderContribution[]
   isPartial: boolean
+  page?: number
+  pageSize?: number
+  totalCount?: number
 }
 
 export interface LicenseExtensionRequestItem {
@@ -154,6 +157,9 @@ export interface PendingApprovalsPage {
   skip: number
   take: number
   items: PendingApprovalSummary[]
+  page?: number
+  pageSize?: number
+  totalCount?: number
 }
 
 export interface SagaTransition {
@@ -211,6 +217,9 @@ export interface AuditEvent {
 export interface RequestAuditPage {
   requestId: string
   events: AuditEvent[]
+  page?: number
+  pageSize?: number
+  totalCount?: number
 }
 
 export interface OpsSummary {
