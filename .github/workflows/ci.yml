@@ -258,7 +258,15 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install
-        run: npm ci
+        # Prefer npm ci when lockfile matches; fall back to npm install when
+        # Dependabot left package.json and package-lock out of sync (same as #71).
+        run: |
+          if npm ci; then
+            echo "npm ci ok"
+          else
+            echo "::warning::npm ci failed (lock drift); running npm install"
+            npm install
+          fi
 
       - name: Lint
         run: npm run lint
