@@ -1,5 +1,6 @@
 namespace EntitleX.Application.Insights.Models;
 
+/// <param name="Diagnosis">Validated structured diagnosis when AiAssist is enabled; null when AI is disabled.</param>
 public sealed record RequestInsightDto(
     Guid RequestId,
     string InsightKind,
@@ -8,7 +9,8 @@ public sealed record RequestInsightDto(
     string NarrationMode,
     string? Model,
     IReadOnlyList<InsightCitation> Citations,
-    RequestInsightFactsDto Facts);
+    RequestInsightFactsDto Facts,
+    IncidentDiagnosisDto? Diagnosis = null);
 
 public sealed record RequestInsightFactsDto(
     string? RequestStatus,

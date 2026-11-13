@@ -38,9 +38,7 @@ public sealed class RequestInsightHandlerTests
                 new FakeRequestRepository(request)),
             builder,
             new DeterministicInsightComposer(),
-            new RequestInsightNarrator(
-                new DisabledCompletion(),
-                NullLogger<RequestInsightNarrator>.Instance));
+            CreateDisabledNarrator());
 
         var dto = await handler.Handle(
             new ExplainRequestQuery(request.Id.Value),
@@ -48,6 +46,7 @@ public sealed class RequestInsightHandlerTests
 
         Assert.Equal("Fallback", dto.NarrationMode);
         Assert.Equal("Explain", dto.InsightKind);
+        Assert.Null(dto.Diagnosis);
         Assert.False(string.IsNullOrWhiteSpace(dto.Summary));
     }
 
@@ -58,9 +57,7 @@ public sealed class RequestInsightHandlerTests
             new FakeCurrentUser("rep", [EntitleXRoles.RenewalRepresentative]),
             new StubBuilder(new RequestInsightContext { RequestId = Guid.NewGuid() }),
             new DeterministicInsightComposer(),
-            new RequestInsightNarrator(
-                new DisabledCompletion(),
-                NullLogger<RequestInsightNarrator>.Instance));
+            CreateDisabledNarrator());
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(new ReconcileRcaQuery(Guid.NewGuid()), CancellationToken.None));
@@ -83,9 +80,7 @@ public sealed class RequestInsightHandlerTests
             new FakeCurrentUser("admin", [EntitleXRoles.PlatformAdmin]),
             new StubBuilder(context),
             new DeterministicInsightComposer(),
-            new RequestInsightNarrator(
-                new DisabledCompletion(),
-                NullLogger<RequestInsightNarrator>.Instance));
+            CreateDisabledNarrator());
 
         var dto = await handler.Handle(
             new ReconcileRcaQuery(request.Id.Value),
@@ -93,7 +88,15 @@ public sealed class RequestInsightHandlerTests
 
         Assert.Equal("Rca", dto.InsightKind);
         Assert.Equal("Fallback", dto.NarrationMode);
+        Assert.Null(dto.Diagnosis);
     }
+
+    private static RequestInsightNarrator CreateDisabledNarrator() =>
+        new(
+            new DisabledGate(),
+            Array.Empty<Microsoft.Extensions.AI.IChatClient>(),
+            new IncidentDiagnosisValidator(),
+            NullLogger<RequestInsightNarrator>.Instance);
 
     private static LicenseExtensionRequest CreateRequest(string requestedBy) =>
         LicenseExtensionRequest.CreateFresh(
@@ -116,16 +119,11 @@ public sealed class RequestInsightHandlerTests
             Task.FromResult(context);
     }
 
-    private sealed class DisabledCompletion : IAiCompletionPort
+    private sealed class DisabledGate : IAiAssistGate
     {
         public bool IsEnabled => false;
         public string? Model => null;
-
-        public Task<string?> CompleteAsync(
-            string systemPrompt,
-            string userPrompt,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<string?>(null);
+        public float Temperature => 0;
     }
 
     private sealed class FakeCurrentUser(string userId, string[] roles, string[]? customerIds = null) : ICurrentUser

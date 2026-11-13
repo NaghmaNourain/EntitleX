@@ -10,5 +10,8 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Microsoft.Extensions.AI + OllamaSharp (aligned with OllamaSharp 5.5.2) -->
+    <MicrosoftExtensionsAIVersion>10.8.0</MicrosoftExtensionsAIVersion>
+    <OllamaSharpVersion>5.5.2</OllamaSharpVersion>
   </PropertyGroup>
 </Project>
