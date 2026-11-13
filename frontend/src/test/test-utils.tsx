@@ -5,7 +5,7 @@ import { render, type RenderOptions } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { ReactElement, ReactNode } from 'react'
 import { AuthProvider } from '../auth/AuthContext'
-import { entitleXTheme } from '../theme/theme'
+import { entitlexTheme } from '../theme/theme'
 
 export function createTestQueryClient() {
   return new QueryClient({
@@ -25,7 +25,7 @@ export function renderWithProviders(
 
   function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <ThemeProvider theme={entitleXTheme}>
+      <ThemeProvider theme={entitlexTheme}>
         <CssBaseline />
         <QueryClientProvider client={client}>
           <MemoryRouter initialEntries={[route]}>
