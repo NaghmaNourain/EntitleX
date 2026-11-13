@@ -1,14 +1,10 @@
+/// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react({ jsxRuntime: 'automatic' })],
-  // Vitest/esbuild path must inject the classic React binding when the automatic
-  // runtime is not applied to test files (seen after TS/plugin resolution drift).
-  esbuild: {
-    jsxInject: "import React from 'react'",
-  },
+  plugins: [react()],
   server: {
     port: 5173,
     proxy: {
