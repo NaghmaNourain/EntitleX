@@ -201,10 +201,15 @@ jobs:
       - name: Build with analyzers
         run: dotnet build EntitleX.sln --configuration Release -p:EnforceCodeStyleInBuild=true
 
-      - name: Terraform fmt check
-        uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_version: 1.5.7
+      # Install via curl so we do not depend on third-party Actions allowlists.
+      - name: Install Terraform
+        env:
+          TERRAFORM_VERSION: "1.5.7"
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
+          sudo unzip -o /tmp/terraform.zip -d /usr/local/bin
+          terraform version
       - name: terraform fmt
         working-directory: infra/terraform
         run: |
@@ -288,94 +293,56 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      # Avoid docker/* and aquasecurity/* Actions (repo allowlist often rejects org/* patterns).
+      - name: Install Trivy
+        env:
+          TRIVY_VERSION: "0.58.1"
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin trivy
+          trivy --version
 
       - name: Build API image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: infra/docker/images/Dockerfile.api
-          push: false
-          load: true
-          tags: entitlex-api:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: docker build -f infra/docker/images/Dockerfile.api -t entitlex-api:ci .
 
       - name: Scan API image (Trivy)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: entitlex-api:ci
-          format: table
-          exit-code: "1"
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --format table entitlex-api:ci
 
       - name: Build OutboxPublisher image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: infra/docker/images/Dockerfile.worker
-          push: false
-          load: true
-          tags: entitlex-outbox-publisher:ci
-          build-args: |
-            PROJECT_PATH=src/workers/EntitleX.OutboxPublisher/EntitleX.OutboxPublisher.csproj
-            DLL_NAME=EntitleX.OutboxPublisher.dll
+        run: |
+          docker build -f infra/docker/images/Dockerfile.worker \
+            --build-arg PROJECT_PATH=src/workers/EntitleX.OutboxPublisher/EntitleX.OutboxPublisher.csproj \
+            --build-arg DLL_NAME=EntitleX.OutboxPublisher.dll \
+            -t entitlex-outbox-publisher:ci .
 
       - name: Scan worker image (Trivy)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: entitlex-outbox-publisher:ci
-          format: table
-          exit-code: "1"
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --format table entitlex-outbox-publisher:ci
 
       - name: Build CloudShield image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: infra/docker/images/Dockerfile.simulator
-          push: false
-          load: true
-          tags: entitlex-cloudshield:ci
-          build-args: |
-            PROJECT_PATH=src/simulators/CloudShield/CloudShield.Api/CloudShield.Api.csproj
-            DLL_NAME=CloudShield.Api.dll
+        run: |
+          docker build -f infra/docker/images/Dockerfile.simulator \
+            --build-arg PROJECT_PATH=src/simulators/CloudShield/CloudShield.Api/CloudShield.Api.csproj \
+            --build-arg DLL_NAME=CloudShield.Api.dll \
+            -t entitlex-cloudshield:ci .
 
       - name: Scan simulator image (Trivy)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: entitlex-cloudshield:ci
-          format: table
-          exit-code: "1"
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --format table entitlex-cloudshield:ci
 
       - name: Build frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: infra/docker/images/Dockerfile.frontend
-          push: false
-          load: true
-          tags: entitlex-frontend:ci
+        run: docker build -f infra/docker/images/Dockerfile.frontend -t entitlex-frontend:ci .
 
       # Frontend is nginx:alpine. CRITICAL stays a hard gate; HIGH OS findings on the
       # Alpine/nginx base are soft-gated (documented in infra/docker/images/README.md)
       # after apk upgrade still left fixable HIGH noise that we cannot clear without
       # abandoning nginx alpine. API/worker/simulator scans remain CRITICAL+HIGH hard-fail.
       - name: Scan frontend image (Trivy JSON)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: entitlex-frontend:ci
-          format: json
-          output: trivy-frontend.json
-          exit-code: "0"
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          vuln-type: os
+        run: |
+          trivy image --exit-code 0 --severity CRITICAL,HIGH --ignore-unfixed \
+            --format json --output trivy-frontend.json --pkg-types os entitlex-frontend:ci
 
       - name: Gate frontend Trivy (CRITICAL hard / HIGH soft)
         run: |
