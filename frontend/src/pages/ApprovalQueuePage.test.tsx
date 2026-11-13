@@ -94,6 +94,7 @@ describe('ApprovalQueuePage', () => {
       expect(screen.getByText(/Queue is empty/i)).toBeInTheDocument()
     })
 
-    expect(await axe(container)).toHaveNoViolations()
+    const results = await axe(container)
+    expect(results.violations).toEqual([])
   })
 })

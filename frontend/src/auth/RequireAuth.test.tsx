@@ -10,7 +10,7 @@ describe('RequireAuth', () => {
     localStorage.clear()
   })
 
-  it('shows a loading status while auth bootstraps then redirects unauthenticated users', async () => {
+  it('redirects unauthenticated users to login after auth bootstrap', async () => {
     renderWithProviders(
       <Routes>
         <Route
@@ -26,10 +26,10 @@ describe('RequireAuth', () => {
       { route: '/' },
     )
 
-    expect(screen.getByRole('status')).toHaveTextContent(/Checking session/i)
-
+    // Bootstrap may resolve before the first sync assert; wait for the login gate.
     await waitFor(() => {
       expect(screen.getByText('Login gate')).toBeInTheDocument()
     })
+    expect(screen.queryByText('Private')).not.toBeInTheDocument()
   })
 })

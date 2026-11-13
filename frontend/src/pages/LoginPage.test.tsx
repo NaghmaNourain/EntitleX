@@ -32,6 +32,6 @@ describe('LoginPage', () => {
   it('has no critical axe violations', async () => {
     const { container } = renderWithProviders(<LoginPage />, { route: '/login' })
     const results = await axe(container)
-    expect(results).toHaveNoViolations()
+    expect(results.violations).toEqual([])
   })
 })
