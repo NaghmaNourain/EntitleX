@@ -5,6 +5,10 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Vitest transforms test JSX via esbuild; inject React for classic JSX scope.
+  esbuild: {
+    jsxInject: "import React from 'react'",
+  },
   server: {
     port: 5173,
     proxy: {

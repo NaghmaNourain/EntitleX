@@ -3,7 +3,7 @@ import { ThemeProvider } from '@mui/material/styles'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, type RenderOptions } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { type ReactElement, type ReactNode } from 'react'
+import React, { type ReactElement, type ReactNode } from 'react'
 import { AuthProvider } from '../auth/AuthContext'
 import { entitlexTheme } from '../theme/theme'
 
