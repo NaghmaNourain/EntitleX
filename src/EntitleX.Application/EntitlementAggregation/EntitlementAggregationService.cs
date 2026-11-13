@@ -89,7 +89,7 @@ public sealed class EntitlementAggregationService : IEntitlementAggregationServi
 
             return new ProviderResult(client.ProviderName, true, items, null, duration);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (IsProviderFailure(ex, cancellationToken))
         {
             var duration = DateTimeOffset.UtcNow - started;
             _logger.LogWarning(
@@ -108,6 +108,14 @@ public sealed class EntitlementAggregationService : IEntitlementAggregationServi
                 duration);
         }
     }
+
+    /// <summary>
+    /// Provider HTTP/resilience failures (including Polly optimistic timeouts that surface as
+    /// <see cref="OperationCanceledException"/>) must not fail the whole aggregation.
+    /// Only honor true client/request abort when <paramref name="cancellationToken"/> is canceled.
+    /// </summary>
+    private static bool IsProviderFailure(Exception ex, CancellationToken cancellationToken) =>
+        ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested;
 
     private sealed record ProviderResult(
         string Provider,

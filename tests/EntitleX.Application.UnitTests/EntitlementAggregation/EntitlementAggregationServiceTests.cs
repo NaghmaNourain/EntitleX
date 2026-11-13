@@ -42,6 +42,38 @@ public sealed class EntitlementAggregationServiceTests
     }
 
     [Fact]
+    public async Task Aggregate_TimeoutCancellation_IsProviderFailure_NotRequestAbort()
+    {
+        var timedOut = new FakeProvider("CloudShield", succeed: false, [], throwCanceled: true);
+        var ok = new FakeProvider(
+            "NetworkGuard",
+            succeed: true,
+            [
+                new NormalizedEntitlementDto(
+                    "NG-1",
+                    "NetworkGuard",
+                    "CUST-1",
+                    "S1",
+                    null,
+                    "B",
+                    DateTimeOffset.UtcNow.AddMonths(1),
+                    null)
+            ]);
+
+        var sut = new EntitlementAggregationService(
+            [timedOut, ok],
+            NullLogger<EntitlementAggregationService>.Instance);
+
+        using var cts = new CancellationTokenSource();
+        var result = await sut.AggregateForCustomerAsync("CUST-1", "corr-timeout", cts.Token);
+
+        Assert.True(result.IsPartial);
+        Assert.Single(result.Entitlements);
+        Assert.Contains(result.Providers, p => p.Provider == "CloudShield" && !p.Succeeded);
+        Assert.Contains(result.Providers, p => p.Provider == "NetworkGuard" && p.Succeeded);
+    }
+
+    [Fact]
     public async Task Aggregate_WhenAllSucceed_IsNotPartial()
     {
         var cs = new FakeProvider("CloudShield", succeed: true,
@@ -71,12 +103,18 @@ public sealed class EntitlementAggregationServiceTests
     {
         private readonly bool _succeed;
         private readonly IReadOnlyList<NormalizedEntitlementDto> _items;
+        private readonly bool _throwCanceled;
 
-        public FakeProvider(string name, bool succeed, IReadOnlyList<NormalizedEntitlementDto> items)
+        public FakeProvider(
+            string name,
+            bool succeed,
+            IReadOnlyList<NormalizedEntitlementDto> items,
+            bool throwCanceled = false)
         {
             ProviderName = name;
             _succeed = succeed;
             _items = items;
+            _throwCanceled = throwCanceled;
         }
 
         public string ProviderName { get; }
@@ -86,6 +124,11 @@ public sealed class EntitlementAggregationServiceTests
             string correlationId,
             CancellationToken cancellationToken = default)
         {
+            if (_throwCanceled)
+            {
+                throw new OperationCanceledException("provider timeout");
+            }
+
             if (!_succeed)
             {
                 throw new HttpRequestException($"{ProviderName} unavailable");

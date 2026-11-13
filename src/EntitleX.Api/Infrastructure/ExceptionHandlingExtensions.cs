@@ -19,8 +19,41 @@ public static class ExceptionHandlingExtensions
             {
                 var feature = context.Features.Get<IExceptionHandlerFeature>();
                 var exception = feature?.Error;
+                var logger = context.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("EntitleX.Api.ExceptionHandler");
+
+                if (exception is not null)
+                {
+                    var statusHint = MapException(exception).StatusCode;
+                    if (statusHint >= StatusCodes.Status500InternalServerError)
+                    {
+                        logger.LogError(
+                            exception,
+                            "Unhandled exception for {Method} {Path}",
+                            context.Request.Method,
+                            context.Request.Path);
+                    }
+                    else
+                    {
+                        logger.LogWarning(
+                            exception,
+                            "Request failed with {StatusCode} for {Method} {Path}",
+                            statusHint,
+                            context.Request.Method,
+                            context.Request.Path);
+                    }
+                }
 
                 var (statusCode, title, detail, errors) = MapException(exception);
+
+                // Surface the real message in Development so lab 500s are diagnosable in the SPA.
+                if (statusCode >= StatusCodes.Status500InternalServerError
+                    && exception is not null
+                    && context.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment())
+                {
+                    detail = exception.GetBaseException().Message;
+                }
 
                 context.Response.StatusCode = statusCode;
                 context.Response.ContentType = "application/problem+json";

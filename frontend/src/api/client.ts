@@ -93,7 +93,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
 export function formatValidationErrors(problem: ProblemDetails | null): string[] {
   if (!problem?.errors) {
-    return problem?.detail ? [problem.detail] : []
+    // Detail is already shown as ApiError.message — avoid duplicating it in the list.
+    return []
   }
   return Object.entries(problem.errors).flatMap(([field, messages]) =>
     messages.map((m) => `${field}: ${m}`),
