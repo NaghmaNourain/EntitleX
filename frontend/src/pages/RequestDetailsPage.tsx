@@ -108,7 +108,7 @@ export function RequestDetailsPage() {
                   Parent {requestQuery.data.parentId.slice(0, 8)}…
                 </Button>
               )}
-              {hasRole('RenewalRepresentative', 'PlatformAdmin') && (
+              {hasRole('RenewalRepresentative', 'DealDeskManager', 'PlatformAdmin') && (
                 <Button
                   size="small"
                   variant="outlined"

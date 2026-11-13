@@ -69,7 +69,9 @@ export default function App() {
                 <Route
                   path="extensions/bulk"
                   element={
-                    <RequireAuth roles={['RenewalRepresentative', 'PlatformAdmin']}>
+                    <RequireAuth
+                      roles={['RenewalRepresentative', 'DealDeskManager', 'PlatformAdmin']}
+                    >
                       <BulkSelectionPage />
                     </RequireAuth>
                   }
@@ -77,7 +79,9 @@ export default function App() {
                 <Route
                   path="extensions/new"
                   element={
-                    <RequireAuth roles={['RenewalRepresentative', 'PlatformAdmin']}>
+                    <RequireAuth
+                      roles={['RenewalRepresentative', 'DealDeskManager', 'PlatformAdmin']}
+                    >
                       <CreateExtensionRequestPage />
                     </RequireAuth>
                   }

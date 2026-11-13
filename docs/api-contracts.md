@@ -6,7 +6,7 @@ Authoritative inventory of HTTP endpoints as of Phase 12. Auth policies live in 
 
 | Policy | Roles |
 |--------|-------|
-| `CanCreateRequests` | `RenewalRepresentative`, `PlatformAdmin` |
+| `CanCreateRequests` | `RenewalRepresentative`, `DealDeskManager`, `PlatformAdmin` |
 | `CanDecideApprovals` | `RenewalManager`, `DealDeskManager`, `PlatformAdmin` |
 | `CanReadApprovals` | any authenticated user |
 | `CanManageReconciliation` | `PlatformAdmin` |

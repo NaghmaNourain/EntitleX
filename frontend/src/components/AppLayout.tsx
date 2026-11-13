@@ -45,7 +45,7 @@ const NAV: NavItem[] = [
     to: '/extensions/new',
     label: 'Create extension',
     icon: <PlaylistAddCheckIcon />,
-    roles: ['RenewalRepresentative', 'PlatformAdmin'],
+    roles: ['RenewalRepresentative', 'DealDeskManager', 'PlatformAdmin'],
   },
   { to: '/approvals/renewal-manager', label: 'Renewal Manager queue', icon: <GavelIcon />, roles: ['RenewalManager', 'PlatformAdmin'] },
   { to: '/approvals/deal-desk', label: 'Deal Desk queue', icon: <FactCheckIcon />, roles: ['DealDeskManager', 'PlatformAdmin'] },

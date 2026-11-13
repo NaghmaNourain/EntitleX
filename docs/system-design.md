@@ -104,7 +104,7 @@ JWT Bearer with fallback authenticated policy. Policies (`AuthorizationPolicies`
 
 | Policy | Roles |
 |--------|-------|
-| `CanCreateRequests` | `RenewalRepresentative`, `PlatformAdmin` |
+| `CanCreateRequests` | `RenewalRepresentative`, `DealDeskManager`, `PlatformAdmin` |
 | `CanDecideApprovals` | `RenewalManager`, `DealDeskManager`, `PlatformAdmin` |
 | `CanReadApprovals` | any authenticated user |
 | `CanManageReconciliation` | `PlatformAdmin` |

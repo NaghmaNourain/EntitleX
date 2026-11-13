@@ -151,6 +151,76 @@ public sealed class CreateLicenseExtensionRequestCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_DealDeskManager_CanCreate()
+    {
+        var requests = new FakeRequestRepository();
+        var sagas = new UnsavedBlindSagaRepository();
+        var currentUser = new FakeCurrentUser(
+            "user-dd-001",
+            "Dana Desk",
+            [EntitleXRoles.DealDeskManager]);
+
+        var handler = new CreateLicenseExtensionRequestCommandHandler(
+            requests,
+            new FakeApprovalRepository(),
+            CreateOrchestrator(sagas, requests, new CapturingOutboxWriter()),
+            new CapturingUnitOfWork(),
+            new NoopNotifications(),
+            currentUser,
+            new ResourceAuthorizationService(currentUser, requests),
+            [new FakeEntitlementClient("CloudShield", Baseline)]);
+
+        var dto = await handler.Handle(
+            new CreateLicenseExtensionRequestCommand(
+                "EXT-DD-1",
+                [
+                    new CreateLicenseExtensionRequestItemDto(
+                        "ent-cs-1",
+                        "CloudShield",
+                        Baseline,
+                        Baseline.AddDays(14))
+                ]),
+            CancellationToken.None);
+
+        Assert.Equal("user-dd-001", dto.RequestedBy);
+        Assert.Equal(LicenseExtensionRequestStatus.InFulfillment.ToString(), dto.Status);
+    }
+
+    [Fact]
+    public async Task Handle_RenewalManager_CannotCreate()
+    {
+        var requests = new FakeRequestRepository();
+        var currentUser = new FakeCurrentUser(
+            "user-rm-001",
+            "Morgan Manager",
+            [EntitleXRoles.RenewalManager],
+            ["CUST-1"]);
+
+        var handler = new CreateLicenseExtensionRequestCommandHandler(
+            requests,
+            new FakeApprovalRepository(),
+            CreateOrchestrator(new UnsavedBlindSagaRepository(), requests, new CapturingOutboxWriter()),
+            new CapturingUnitOfWork(),
+            new NoopNotifications(),
+            currentUser,
+            new ResourceAuthorizationService(currentUser, requests),
+            [new FakeEntitlementClient("CloudShield", Baseline)]);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            handler.Handle(
+                new CreateLicenseExtensionRequestCommand(
+                    "EXT-RM-1",
+                    [
+                        new CreateLicenseExtensionRequestItemDto(
+                            "ent-cs-1",
+                            "CloudShield",
+                            Baseline,
+                            Baseline.AddDays(14))
+                    ]),
+                CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Handle_HumanApprovalBand_StartsSagaWithoutDispatch()
     {
         var requests = new FakeRequestRepository();
