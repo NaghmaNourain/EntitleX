@@ -54,10 +54,11 @@ public sealed class CreateLicenseExtensionRequestCommandHandler
         }
 
         if (!_currentUser.IsInRole(EntitleXRoles.RenewalRepresentative)
+            && !_currentUser.IsInRole(EntitleXRoles.DealDeskManager)
             && !_currentUser.IsInRole(EntitleXRoles.PlatformAdmin))
         {
             throw new ForbiddenException(
-                "Creating license-extension requests requires RenewalRepresentative or PlatformAdmin.");
+                "Creating license-extension requests requires RenewalRepresentative, DealDeskManager, or PlatformAdmin.");
         }
 
         // Bind actor from authenticated identity — never from the client body.

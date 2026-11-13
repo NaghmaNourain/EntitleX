@@ -115,6 +115,7 @@ public static class AuthenticationServiceCollectionExtensions
                 AuthorizationPolicies.CanCreateRequests,
                 policy => policy.RequireRole(
                     Domain.Identity.EntitleXRoles.RenewalRepresentative,
+                    Domain.Identity.EntitleXRoles.DealDeskManager,
                     Domain.Identity.EntitleXRoles.PlatformAdmin));
 
             options.AddPolicy(

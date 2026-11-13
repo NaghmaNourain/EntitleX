@@ -119,7 +119,7 @@ Store: `EfRetryClaimStore` (`IRetryClaimStore`) — `FindByIdempotencyKeyAsync`,
 
 ## AuthZ
 
-Requires `CanCreateRequests` (`RenewalRepresentative` or `PlatformAdmin`). The
+Requires `CanCreateRequests` (`RenewalRepresentative`, `DealDeskManager`, or `PlatformAdmin`). The
 handler also re-checks those roles so MediatR callers cannot bypass the policy.
 
 ## HTTP write idempotency (create / start / decide)
