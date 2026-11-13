@@ -16,10 +16,13 @@ using EntitleX.Infrastructure.Retry;
 using EntitleX.Messaging;
 using EntitleX.Messaging.Abstractions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using OllamaSharp;
 
 namespace EntitleX.Infrastructure;
 
@@ -252,23 +255,35 @@ public static class DependencyInjection
             }
         });
 
-        services.AddHttpClient(OpenAiCompatibleCompletionClient.HttpClientName, (sp, client) =>
-        {
-            var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AiAssistOptions>>().Value;
-            var baseUrl = string.IsNullOrWhiteSpace(options.BaseUrl)
-                ? "http://127.0.0.1:11434/v1"
-                : options.BaseUrl.TrimEnd('/') + "/";
-            client.BaseAddress = new Uri(baseUrl);
-            client.Timeout = TimeSpan.FromSeconds(
-                options.TimeoutSeconds <= 0 ? 30 : options.TimeoutSeconds);
-            if (!string.IsNullOrWhiteSpace(options.ApiKey))
-            {
-                client.DefaultRequestHeaders.Authorization =
-                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", options.ApiKey);
-            }
-        });
+        services.AddSingleton<IAiAssistGate, OptionsAiAssistGate>();
 
-        services.AddSingleton<IAiCompletionPort, OpenAiCompatibleCompletionClient>();
+        // IChatClient is registered only when AiAssist is enabled at startup.
+        // When disabled, RequestInsightNarrator sees an empty IEnumerable<IChatClient> and stays on Fallback.
+        var enabled = configuration.GetValue($"{AiAssistOptions.SectionName}:Enabled", false);
+        if (enabled)
+        {
+            services.AddSingleton<IChatClient>(sp =>
+            {
+                var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AiAssistOptions>>().Value;
+                var uri = AiAssistEndpointNormalizer.ToOllamaUri(options.BaseUrl);
+                var model = string.IsNullOrWhiteSpace(options.Model) ? "llama3.2" : options.Model;
+                var timeout = TimeSpan.FromSeconds(options.TimeoutSeconds <= 0 ? 30 : options.TimeoutSeconds);
+
+                var httpClient = new HttpClient
+                {
+                    BaseAddress = uri,
+                    Timeout = timeout
+                };
+
+                IChatClient inner = new OllamaApiClient(httpClient, model);
+                return inner
+                    .AsBuilder()
+                    .UseOpenTelemetry(configure: otel => otel.EnableSensitiveData = false)
+                    .UseLogging()
+                    .Build(sp);
+            });
+        }
+
         return services;
     }
 
