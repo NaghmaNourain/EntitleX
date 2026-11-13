@@ -291,6 +291,16 @@ export interface RequestInsightFacts {
   notes: string[]
 }
 
+export interface IncidentDiagnosis {
+  rootCauseCategory: string
+  rootCause: string
+  evidenceStepIds: string[]
+  confidence: number
+  recommendedAction: string
+  requiresHumanApproval: boolean
+  validated: boolean
+}
+
 export interface RequestInsight {
   requestId: string
   insightKind: string
@@ -300,4 +310,6 @@ export interface RequestInsight {
   model: string | null
   citations: InsightCitation[]
   facts: RequestInsightFacts
+  /** Validated structured diagnosis when AiAssist is enabled; absent/null when AI is disabled. */
+  diagnosis?: IncidentDiagnosis | null
 }

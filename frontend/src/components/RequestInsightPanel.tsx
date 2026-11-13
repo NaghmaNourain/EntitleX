@@ -8,9 +8,9 @@ import Paper from '@mui/material/Paper'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { api } from '../api/endpoints'
-import type { RequestInsight } from '../api/types'
+import type { IncidentDiagnosis, InsightCitation, RequestInsight } from '../api/types'
 import { ErrorAlert } from './ErrorAlert'
 import { LoadingState } from './LoadingState'
 
@@ -63,7 +63,8 @@ export function RequestInsightPanel({
 
         <Typography variant="body2" color="text.secondary">
           Grounded from request, approval, saga, audit, ledger, and poison outbox. Optional local
-          Ollama may rephrase the summary; recommended action stays deterministic. No writes.
+          Ollama may return a validated structured diagnosis; recommended action on the request stays
+          deterministic. No writes.
         </Typography>
 
         {enabled && query.isLoading && <LoadingState />}
@@ -75,6 +76,14 @@ export function RequestInsightPanel({
 }
 
 function InsightBody({ insight }: { insight: RequestInsight }) {
+  const citationById = useMemo(() => {
+    const map = new Map<string, InsightCitation>()
+    for (const c of insight.citations) {
+      map.set(c.id, c)
+    }
+    return map
+  }, [insight.citations])
+
   return (
     <Stack spacing={1.5}>
       <Alert severity="info">{insight.summary}</Alert>
@@ -87,6 +96,11 @@ function InsightBody({ insight }: { insight: RequestInsight }) {
           variant="outlined"
         />
       </Stack>
+
+      {insight.diagnosis ? (
+        <DiagnosisSection diagnosis={insight.diagnosis} citationById={citationById} />
+      ) : null}
+
       {insight.citations.length > 0 && (
         <>
           <Typography variant="subtitle2">Citations</Typography>
@@ -104,6 +118,70 @@ function InsightBody({ insight }: { insight: RequestInsight }) {
                 />
               </ListItem>
             ))}
+          </List>
+        </>
+      )}
+    </Stack>
+  )
+}
+
+function DiagnosisSection({
+  diagnosis,
+  citationById,
+}: {
+  diagnosis: IncidentDiagnosis
+  citationById: Map<string, InsightCitation>
+}) {
+  const confidencePct = Number.isFinite(diagnosis.confidence)
+    ? `${Math.round(diagnosis.confidence * 100)}%`
+    : '—'
+
+  return (
+    <Stack spacing={1}>
+      <Typography variant="subtitle2">Structured diagnosis</Typography>
+      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+        <Chip
+          label={diagnosis.rootCauseCategory}
+          color={diagnosis.validated ? 'primary' : 'default'}
+          variant="outlined"
+        />
+        <Chip size="small" label={`Confidence ${confidencePct}`} variant="outlined" />
+        <Chip
+          size="small"
+          label={`Diagnosis action: ${diagnosis.recommendedAction}`}
+          color="warning"
+          variant="outlined"
+        />
+        {diagnosis.requiresHumanApproval && (
+          <Chip size="small" label="Requires human approval" color="warning" />
+        )}
+        {!diagnosis.validated && (
+          <Chip size="small" label="Unable to validate" color="default" variant="outlined" />
+        )}
+      </Stack>
+      <Typography variant="body2">{diagnosis.rootCause}</Typography>
+      {diagnosis.evidenceStepIds.length > 0 && (
+        <>
+          <Typography variant="subtitle2">Evidence</Typography>
+          <List dense disablePadding>
+            {diagnosis.evidenceStepIds.map((id) => {
+              const citation = citationById.get(id)
+              return (
+                <ListItem key={id} disableGutters sx={{ py: 0.25 }}>
+                  <ListItemText
+                    primary={
+                      citation ? `${citation.kind}: ${citation.label}` : 'Evidence step'
+                    }
+                    secondary={id}
+                    primaryTypographyProps={{ variant: 'body2' }}
+                    secondaryTypographyProps={{
+                      variant: 'caption',
+                      sx: { fontFamily: 'IBM Plex Mono, monospace' },
+                    }}
+                  />
+                </ListItem>
+              )
+            })}
           </List>
         </>
       )}

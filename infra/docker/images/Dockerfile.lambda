@@ -2,7 +2,7 @@
 # Publishes a .NET Lambda-compatible package (also runnable as console host locally).
 ARG PROJECT_PATH=src/lambdas/EntitleX.ApprovalReminder/EntitleX.ApprovalReminder.csproj
 ARG DLL_NAME=EntitleX.ApprovalReminder.dll
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG PROJECT_PATH
 WORKDIR /src
 COPY Directory.Build.props global.json EntitleX.sln ./

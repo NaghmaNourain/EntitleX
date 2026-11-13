@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.Configure<ReconciliationAgingOptions>(_ => { });
         services.AddScoped<IRequestInsightContextBuilder, RequestInsightContextBuilder>();
         services.AddSingleton<DeterministicInsightComposer>();
+        services.AddSingleton<IncidentDiagnosisValidator>();
         services.AddScoped<RequestInsightNarrator>();
         services.AddSagaOrchestration();
 

@@ -108,7 +108,7 @@ Read-only operator helpers (no writes; Manual Reconcile / Retry stay explicit):
 | `GET /api/v1/license-extension-requests/{id}/explain` | CanReadApprovals + resource read | Natural-language status from request/approval/saga/audit/ledger/poison + live probes for Uncertain items |
 | `GET /api/v1/admin/reconciliation/requests/{id}/rca` | PlatformAdmin | Reconciliation RCA emphasizing Uncertain, ledger mismatches, probes, poison outbox |
 
-Narration is **deterministic Fallback by default** (`AiAssist:Enabled=false`). Optional local Ollama (OpenAI-compatible `BaseUrl`, e.g. `http://127.0.0.1:11434/v1`) may rephrase the summary only; `recommendedAction`, citations, and facts stay composer-authored. No Bedrock / SageMaker / paid cloud LLM is required — keep AWS lab on Fallback.
+Insights are **deterministic Fallback by default** (`AiAssist:Enabled=false`). Optional local Ollama (Microsoft.Extensions.AI + OllamaSharp, `BaseUrl` e.g. `http://127.0.0.1:11434`) may return a **validated structured `IncidentDiagnosis`** (`rootCauseCategory`, confidence, evidence step ids, recommended action). Top-level `recommendedAction`, citations, and facts stay composer-authored. Unvalidated model output is never returned. No Bedrock / SageMaker / paid cloud LLM is required — keep AWS lab on Fallback. Details: [ai-agent.md](ai-agent.md).
 
 ## Related
 

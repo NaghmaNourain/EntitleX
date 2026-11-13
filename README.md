@@ -16,14 +16,14 @@ Enterprise license-extension platform (portfolio). Orchestrates extension reques
 - **Workers**: OutboxPublisher, FulfillmentWorker, ReconciliationWorker, NotificationService
 - **Lambdas** (local hosts + EventBridge): ApprovalReminder, ExpirationNotification
 - **Observability**: OTel → Jaeger, Prometheus/Grafana, Serilog — [docs/observability.md](docs/observability.md)
-- **Insights (optional)**: grounded Explain / reconciliation RCA (`AiAssist:Enabled=false` by default; optional local Ollama only — no AWS AI spend) — [docs/reconciliation.md](docs/reconciliation.md)
+- **Insights (optional)**: grounded Explain / reconciliation RCA with optional validated structured diagnosis via Microsoft.Extensions.AI + Ollama (`AiAssist:Enabled=false` by default; no AWS AI spend) — [docs/ai-agent.md](docs/ai-agent.md), [docs/reconciliation.md](docs/reconciliation.md)
 - **Frontend**: Vite React control-plane UI — [frontend/README.md](frontend/README.md)
 - **Optional AWS**: Terraform under `infra/terraform/` — [docs/deployment.md](docs/deployment.md)
 - ADR: [docs/adr/0001-modular-api-vs-microservices.md](docs/adr/0001-modular-api-vs-microservices.md)
 
 ## Prerequisites
 
-- [.NET SDK 8.x](https://dotnet.microsoft.com/download/dotnet/8.0) (see `global.json`)
+- [.NET SDK 9.x](https://dotnet.microsoft.com/download/dotnet/9.0) (see `global.json`; apps still target `net8.0`)
 - Node.js 20+ / 22 and npm (frontend)
 - Docker + Docker Compose (local dependencies; integration tests use Testcontainers)
 
@@ -84,20 +84,21 @@ terraform init && terraform plan
 
 Secrets (JWT, connection strings) go into Secrets Manager **outside** Terraform — never commit them. Details: [docs/deployment.md](docs/deployment.md).
 
-### Optional: local Ollama for insight narration
+### Optional: local Ollama for structured insight diagnosis
 
-Explain / RCA always return a deterministic grounded summary. To optionally rephrase with a local model (no cloud cost):
+Explain / RCA always return a deterministic grounded summary (and composer `recommendedAction`). To optionally add a validated `IncidentDiagnosis` with a local model (no cloud cost):
 
 ```bash
-# Install/run Ollama, then: ollama pull llama3.2
+# Install/run Ollama, then: ollama pull qwen2.5:7b   # or llama3.2
 # In EntitleX.Api config or env:
 # AiAssist__Enabled=true
-# AiAssist__BaseUrl=http://127.0.0.1:11434/v1
-# AiAssist__Model=llama3.2
+# AiAssist__BaseUrl=http://127.0.0.1:11434
+# AiAssist__Model=qwen2.5:7b
+# AiAssist__Temperature=0
 # ENTITLEX_AI_API_KEY=ollama   # optional; Ollama ignores auth
 ```
 
-Leave `AiAssist:Enabled=false` (default) on AWS lab / CI.
+Leave `AiAssist:Enabled=false` (default) on AWS lab / CI. See [docs/ai-agent.md](docs/ai-agent.md).
 
 ### Auth
 
