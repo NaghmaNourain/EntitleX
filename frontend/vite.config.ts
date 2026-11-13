@@ -4,10 +4,6 @@ import { defineConfig } from 'vitest/config'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // Ensure Vitest/esbuild emit the automatic JSX runtime (avoids "React is not defined").
-  esbuild: {
-    jsx: 'automatic',
-  },
   server: {
     port: 5173,
     proxy: {
