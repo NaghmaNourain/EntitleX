@@ -93,7 +93,12 @@ export function ApprovalQueuePage({
                   <TableCell>{row.currentStageRole ?? '—'}</TableCell>
                   <TableCell>{new Date(row.createdAtUtc).toISOString()}</TableCell>
                   <TableCell>
-                    <Button size="small" variant="contained" onClick={() => setActiveRequestId(row.requestId)}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      aria-label={`Decide approval for request ${row.requestId}`}
+                      onClick={() => setActiveRequestId(row.requestId)}
+                    >
                       Decide
                     </Button>
                   </TableCell>

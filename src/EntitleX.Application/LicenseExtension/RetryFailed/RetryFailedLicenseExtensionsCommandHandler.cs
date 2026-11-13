@@ -62,10 +62,11 @@ public sealed class RetryFailedLicenseExtensionsCommandHandler
                     $"Idempotency key '{command.IdempotencyKey}' is already bound to a different source request.");
             }
 
-            var prior = await _requestRepository.GetByIdAsync(existing.RetryRequestId, cancellationToken)
-                ?? throw new ConflictException(
-                    $"Prior retry '{existing.RetryRequestId.Value}' for idempotency key was not found.");
-            return prior.ToDto();
+            // Claim can be visible before the winning caller persists the retry aggregate.
+            return await ResolveClaimConflictAsync(
+                command,
+                RequestId.From(command.SourceRequestId),
+                cancellationToken);
         }
 
         var sourceId = RequestId.From(command.SourceRequestId);

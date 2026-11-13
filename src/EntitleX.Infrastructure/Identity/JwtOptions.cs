@@ -12,7 +12,8 @@ public sealed class JwtOptions
     public string Audience { get; set; } = "EntitleX";
 
     /// <summary>Access-token lifetime for minting (dev tokens).</summary>
-    public int AccessTokenLifetimeMinutes { get; set; } = 480;
+    /// <summary>DevToken / HMAC lifetime. Keep short in Development (default 60); Production uses OIDC.</summary>
+    public int AccessTokenLifetimeMinutes { get; set; } = 60;
 
     /// <summary>
     /// When true, exposes Development-only token minting endpoint.

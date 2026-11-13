@@ -57,6 +57,7 @@ CI builds a subset of images without pushing (see below).
 
 - **CORS is Development-only** (`FrontendDev` origins `localhost:5173` / `127.0.0.1:5173`). Non-Development hosts do **not** register browser CORS policies.
 - Production / Compose SPA assumes **same-origin** behind nginx (or ALB path routing): the browser talks to one origin; nginx serves the Vite build and proxies `/api` + `/health*` to the API. See `infra/docker/images/nginx-frontend.conf` (extend with `location /api/` → API upstream when co-hosting).
+- The frontend container listens on **`:8080`** as the non-root `nginx` user (not `:80`). Map host/ALB target groups to **8080**; Vite dev still uses `:5173`.
 - Cross-origin SPA + API in Production is intentionally unsupported without a new ADR.
 
 ## EF Core migrations (Production)
@@ -100,11 +101,11 @@ Triggers: `push`, `pull_request` (concurrency cancel-in-progress).
 
 | Job | What |
 |-----|------|
-| `build-test` | Restore, vulnerable-package audit (fail High+), Release build (`TreatWarningsAsErrors`), unit tests with XPlat coverage (soft Domain/Application floor), integration + API WebApplicationFactory + E2E scaffolding |
+| `build-test` | Restore, vulnerable-package audit (**fail** High+), Release build (`TreatWarningsAsErrors`), unit tests with XPlat coverage (soft Domain/Application floor), integration + API WebApplicationFactory + E2E scaffolding |
 | `static-analysis` | Hard `dotnet format --verify-no-changes`, analyzer build, `terraform fmt -check` |
-| `gitleaks` | Secret scan (`gitleaks-action`) |
-| `frontend` | Node 22, `npm ci`, oxlint, `npm run build` |
-| `docker-images` | Build API / worker / CloudShield / frontend (`push: false`); Trivy CRITICAL/HIGH on each loaded image; images run as non-root + `HEALTHCHECK` |
+| `gitleaks` | OSS `gitleaks detect` + `.gitleaks.toml` lab allowlist |
+| `frontend` | Node 22, `npm ci` (fallback `npm install`), oxlint, **Vitest** unit/a11y tests, `npm run build` |
+| `docker-images` | Build API / worker / CloudShield / frontend (`push: false`); Trivy CRITICAL/HIGH (frontend OS: CRITICAL hard / HIGH soft); non-root + `HEALTHCHECK` |
 
 Also: `.github/workflows/codeql.yml` (C# + JS/TS on `main` / PRs + weekly) and `.github/dependabot.yml` (NuGet, npm, Actions, Docker — weekly).
 
@@ -138,6 +139,19 @@ Local hosts: [lambdas.md](lambdas.md).
 ## Cost pointer
 
 Read **[infra/terraform/COST.md](../infra/terraform/COST.md)** before `terraform apply`. Guidance: tear down when idle; keep ECS/Lambda gated off until images and secrets exist; avoid NAT unless required.
+
+## Staging checklist (ops)
+
+Before pointing real users at a shared environment:
+
+1. **OIDC:** `Oidc:Enabled=true`, non-empty `Oidc:Authority` + `Oidc:Audience`; DevToken off (`Jwt:EnableDevTokenEndpoint=false`).
+2. **Secrets:** JWT (if any), connection strings, Kafka bootstrap from Secrets Manager / env — never Compose `admin`/`entitlex` defaults.
+3. **Migrations:** `Database:MigrateOnStartup=false`; run `dotnet ef database update` (or migrate job) before traffic; confirm `GET /health/ready`.
+4. **HTTPS:** Non-Development HSTS/headers path; terminate TLS at ALB/ingress.
+5. **Simulators:** private network only + API keys; do not publish `:5081`/`:5082`.
+6. **Frontend:** target group / publish port **8080**; same-origin nginx or ALB path routing.
+7. **Smoke:** Keycloak (or IdP) login → SPA → create/approve one request with real roles.
+8. **E2E (optional):** `ENTITLEX_E2E=1` + Compose for the 1000-item scenario harness when implemented.
 
 ## HA / DR
 

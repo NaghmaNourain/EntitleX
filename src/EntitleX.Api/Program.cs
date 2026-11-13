@@ -129,23 +129,23 @@ try
     }
 
     app.MapGet("/health", () => Results.Ok(new
-        {
-            status = "Healthy",
-            service = "EntitleX.Api",
-            timestampUtc = DateTimeOffset.UtcNow
-        }))
+    {
+        status = "Healthy",
+        service = "EntitleX.Api",
+        timestampUtc = DateTimeOffset.UtcNow
+    }))
         .AllowAnonymous();
 
     app.MapHealthChecks("/health/ready", new HealthCheckOptions
-        {
-            ResponseWriter = HealthCheckResponseWriter.WriteAsync
-        })
+    {
+        ResponseWriter = HealthCheckResponseWriter.WriteAsync
+    })
         .AllowAnonymous();
     app.MapHealthChecks("/health/providers", new HealthCheckOptions
-        {
-            Predicate = check => check.Tags.Contains("provider"),
-            ResponseWriter = HealthCheckResponseWriter.WriteAsync
-        })
+    {
+        Predicate = check => check.Tags.Contains("provider"),
+        ResponseWriter = HealthCheckResponseWriter.WriteAsync
+    })
         .AllowAnonymous();
     app.MapEntitleXPrometheusScrapingEndpoint()
         .RequireEntitleXMetricsAuth(app.Environment, app.Configuration);

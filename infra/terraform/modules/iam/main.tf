@@ -66,7 +66,7 @@ resource "aws_iam_role_policy" "ecs_task" {
         Sid      = "SesSend"
         Effect   = "Allow"
         Action   = ["ses:SendEmail", "ses:SendRawEmail"]
-        Resource = ["*"]
+        Resource = [var.ses_identity_arn]
       },
       {
         Sid    = "S3AuditExports"
@@ -124,7 +124,7 @@ resource "aws_iam_role_policy" "lambda" {
       {
         Effect   = "Allow"
         Action   = ["ses:SendEmail", "ses:SendRawEmail"]
-        Resource = ["*"]
+        Resource = [var.ses_identity_arn]
       }
     ]
   })
