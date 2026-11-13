@@ -296,7 +296,7 @@ jobs:
       # Avoid docker/* and aquasecurity/* Actions (repo allowlist often rejects org/* patterns).
       - name: Install Trivy
         env:
-          TRIVY_VERSION: "0.58.1"
+          TRIVY_VERSION: "0.76.2"
         run: |
           set -euo pipefail
           curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
