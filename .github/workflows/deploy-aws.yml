@@ -94,7 +94,7 @@ jobs:
           done
 
       - name: Build and push API
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infra/docker/images/Dockerfile.api
@@ -102,7 +102,7 @@ jobs:
           tags: ${{ steps.urls.outputs.api }}
 
       - name: Build and push OutboxPublisher
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infra/docker/images/Dockerfile.worker
@@ -113,7 +113,7 @@ jobs:
             DLL_NAME=EntitleX.OutboxPublisher.dll
 
       - name: Build and push FulfillmentWorker
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infra/docker/images/Dockerfile.worker
@@ -124,7 +124,7 @@ jobs:
             DLL_NAME=EntitleX.FulfillmentWorker.dll
 
       - name: Build and push CloudShield
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infra/docker/images/Dockerfile.simulator
@@ -135,7 +135,7 @@ jobs:
             DLL_NAME=CloudShield.Api.dll
 
       - name: Build and push NetworkGuard
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infra/docker/images/Dockerfile.simulator
